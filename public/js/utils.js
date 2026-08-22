@@ -189,6 +189,19 @@ export function cleanModelMarkdown(value) {
   return String(value ?? '').trim().replace(/^```(?:markdown|md)?\s*/i, '').replace(/\s*```$/, '');
 }
 
+export function getAuditViolations(audit) {
+  return Array.isArray(audit?.violations) ? audit.violations : [];
+}
+
+export function getAuditBurden(audit) {
+  const weights = { high: 4, medium: 2, low: 1 };
+  return getAuditViolations(audit).reduce((total, item) => total + (weights[item?.severity] || 2), 0);
+}
+
+export function hasAuditPassed(audit) {
+  return getAuditViolations(audit).length === 0;
+}
+
 export function safeImageSource(value) {
   const source = String(value ?? '');
   return /^(?:data:image\/(?:png|jpeg|webp|svg\+xml);base64,|https:\/\/)/i.test(source) ? source : '';

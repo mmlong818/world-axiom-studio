@@ -203,7 +203,14 @@
         </div>
         <div class="forge-layout">
           <div class="forge-progress" id="forgeProgress"></div>
-          <article class="world-preview prose" id="worldPreview"><div class="empty-state"><svg><use href="#i-layers"/></svg><strong>等待选择世界模型</strong><span>选中后，这里会依照因果顺序构建完整世界。</span></div></article>
+          <div class="forge-output">
+            <section class="forge-activity" id="forgeActivity" aria-label="当前构建节点" hidden>
+              <div class="forge-activity-head"><span id="forgeNodeCode">节点 01 / 04</span><time id="forgeNodeElapsed">已等待 0 秒</time></div>
+              <div class="forge-activity-message" aria-live="polite" aria-atomic="true"><strong id="forgeNodeTitle">正在建立整体认识与运转方式</strong><p id="forgeNodeDetail">确定这个世界最先需要理解的事实，以及它如何影响普通人的生活。</p></div>
+              <div class="forge-activity-foot"><span id="forgeNodeCompleted">已完成 0 / 4</span><span id="forgeNodeNext">下一节点：地方与历史</span></div>
+            </section>
+            <article class="world-preview prose" id="worldPreview"><div class="empty-state"><svg><use href="#i-layers"/></svg><strong>等待选择世界模型</strong><span>选中后，这里会依照因果顺序构建完整世界。</span></div></article>
+          </div>
         </div>
       </section>
 
@@ -217,7 +224,7 @@
           <section class="audit-panel"><div class="panel-title"><span>需要修补</span><small id="violationCount">0 项</small></div><div id="violationsList"></div></section>
           <section class="audit-panel"><div class="panel-title"><span>已通过规则</span><small>结构基础</small></div><div class="passed-list" id="passedRules"></div></section>
         </div>
-        <div class="audit-actions"><button class="secondary-button" id="skipRepair" type="button">保留现状</button><button class="primary-button" id="repairWorld" type="button"><span>按最小方案自动修补</span><svg><use href="#i-check"/></svg></button></div>
+        <div class="audit-actions"><button class="secondary-button" id="skipRepair" type="button">保留现状</button><button class="primary-button" id="repairWorld" type="button"><span>让 AI 自主修补到通过</span><svg><use href="#i-check"/></svg></button></div>
       </section>
 
       <section class="screen" id="screen-export" data-screen="export" hidden>
@@ -292,9 +299,9 @@
           <label><span>服务商</span><select id="providerSelect"></select></label>
           <label><span>模型 ID</span><input id="modelInput" type="text" spellcheck="false" autocomplete="off"></label>
           <label class="full-row"><span>API 端点</span><input id="baseUrlInput" type="url" inputmode="url" spellcheck="false" autocomplete="off"></label>
-          <label class="full-row"><span>API Key</span><input id="apiKeyInput" type="password" spellcheck="false" autocomplete="off" placeholder="只保存在当前页面内存中"></label>
+          <label class="full-row"><span>API Key</span><input id="apiKeyInput" type="password" spellcheck="false" autocomplete="off" placeholder="保存在这个本地浏览器中"></label>
           <label><span>创意强度 <output id="temperatureOutput">0.7</output></span><input id="temperatureInput" type="range" min="0" max="1.2" value="0.7" step="0.1"></label>
-          <div class="security-callout"><svg><use href="#i-lock"/></svg><span>密钥不会写入浏览器存储、文件或日志；关闭页面后即消失。本地模型端点可不填密钥。</span></div>
+          <div class="security-callout"><svg><use href="#i-lock"/></svg><span>密钥只保存在当前设备的这个浏览器中，不会写入源码、日志、世界存档、导出文件或远端仓库。</span></div>
         </div>
         <details class="image-settings">
           <summary>图片模型（可选）</summary>
@@ -305,15 +312,26 @@
           </div>
         </details>
       </div>
-      <footer><span id="healthStatus">本地服务已连接</span><button class="primary-button small" id="saveSettings" value="default"><span>应用设置</span></button></footer>
+      <footer><span id="healthStatus">本地服务已连接</span><div class="settings-actions"><button class="text-button" id="clearSavedKeys" type="button">清除本机密钥</button><button class="primary-button small" id="saveSettings" value="default"><span>应用并保存</span></button></div></footer>
     </form>
   </dialog>
 
   <div class="loading-overlay" id="loadingOverlay" hidden>
-    <div class="loading-card"><div class="loading-sigil"><span></span><span></span><span></span></div><strong id="loadingTitle">正在建立世界模型</strong><p id="loadingDetail">先区分事实、推导与未知，再建立因果骨架。</p><div class="loading-track"><i id="loadingBar"></i></div></div>
+    <div class="loading-card" id="loadingCard">
+      <div class="loading-head">
+        <div class="loading-sigil" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div><strong id="loadingTitle">正在建立世界模型</strong><p id="loadingDetail" role="status" aria-live="polite">先区分事实、推导与未知，再建立因果骨架。</p></div>
+      </div>
+      <div class="loading-track" id="loadingTrack"><i id="loadingBar"></i></div>
+      <section class="loading-operation" id="loadingOperation" aria-label="操作进度" hidden>
+        <div class="loading-operation-meta"><span id="loadingModel">模型处理中</span><time id="loadingElapsed">已等待 0 秒</time></div>
+        <ol class="loading-stages" id="loadingStages"></ol>
+        <p class="loading-assurance" id="loadingAssurance">模型返回后会自动校验并进入选择页面，无需重复点击。</p>
+      </section>
+    </div>
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-  <script type="module" src="/js/app.js?v=30"></script>
+  <script type="module" src="/js/app.js?v=35"></script>
 </body>
 </html>

@@ -37,8 +37,9 @@
   .seed-card-grid { grid-template-columns: 1fr; }
   .seed-card { min-height: 0; }
   .forge-layout { grid-template-columns: 1fr; }
-  .forge-progress { position: static; grid-template-columns: repeat(3,1fr); }
+  .forge-progress { position: static; grid-template-columns: repeat(4,1fr); }
   .forge-step { grid-template-columns: 24px 1fr; padding: 8px; }
+  .forge-activity-head, .forge-activity-foot { align-items: flex-start; flex-direction: column; gap: 4px; }
   .audit-grid { grid-template-columns: 1fr; }
 }
 
@@ -97,8 +98,14 @@
   .confirm-actions { flex-direction: column-reverse; }
   .confirm-actions button { width: 100%; }
   .settings-body { padding: 18px 16px; }
-  .settings-card footer span { display: none; }
+  .settings-card footer > #healthStatus { display: none; }
+  .settings-actions { width: 100%; flex-direction: column-reverse; }
   .settings-card footer button { width: 100%; }
+  .loading-card { padding: 22px 18px; }
+  .loading-head { grid-template-columns: 52px 1fr; gap: 14px; }
+  .loading-sigil { width: 52px; height: 52px; }
+  .loading-sigil span:nth-child(3) { inset: 20px; }
+  .loading-operation-meta { align-items: flex-start; flex-direction: column; gap: 3px; }
   .toast { right: 12px; bottom: 82px; left: 12px; max-width: none; }
 }
 

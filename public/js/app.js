@@ -1,23 +1,45 @@
 import { api } from './api.js';
 import { buildImagePrompts, buildSimplePreview, buildWikiPreview, downloadDeliverable } from './exporters.js?v=15';
-import { cleanModelMarkdown, countSourceDossierFacts, escapeHtml, fileToBase64, normalizeSourceDossier, parseModelJson, renderMarkdown, validateWorldModule } from './utils.js?v=4';
+import { cleanModelMarkdown, countSourceDossierFacts, escapeHtml, fileToBase64, getAuditBurden, getAuditViolations, hasAuditPassed, normalizeSourceDossier, parseModelJson, renderMarkdown, validateWorldModule } from './utils.js?v=5';
 import { addWorldTask, archiveWorld, createBlankWorld, deleteArchivedWorld, getWorld, initializeWorldStore, listWorlds, putWorld, restoreWorld } from './world-store.js?v=9';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 const MODEL_SETTINGS_KEY = 'world-axiom-model-settings-v1';
+const MODEL_CREDENTIALS_KEY = 'world-axiom-model-credentials-v1';
 
 const state = {
   source: { mode: 'brief', brief: '', ipTier: '自动判断', book: null },
   purpose: '世界之书', skin: '自动判断', buildIntent: 'auto', dials: {}, tone: '自动判断', focuses: [],
-  providers: [], config: {}, triage: null, sourceDossier: null, cards: [], selectedSeed: null,
+  providers: [], config: {}, credentialProvider: '', triage: null, sourceDossier: null, cards: [], selectedSeed: null,
   modules: {}, world: '', audit: null, summary: '', art: [], exportTab: 'wiki',
   currentWorldId: '', activeLibraryWorldId: '', libraryWorlds: [],
 };
 
 const screens = ['library', 'input', 'cards', 'forge', 'audit', 'export'];
 const FORGE_BATCHES = ['L1', 'L2', 'L3', 'L4'];
+const MAX_AUTONOMOUS_REPAIR_ATTEMPTS = 4;
 const batchLabels = { L1: ['第一、二部分 · 世界概览', '前提 · 运转 · 常识'], L2: ['第三、四部分 · 地方与历史', '关系 · 转折 · 当下'], L3: ['第五部分 · 人们怎样生活', '社会 · 生计 · 日常'], L4: ['第六部分 · 重要名称', '关键条目 · 关联 · 索引'] };
+const forgeNodeDetails = {
+  L1: ['建立整体认识与运转方式', '回答这是什么世界、首先能看到什么，以及核心规则怎样影响普通生活。'],
+  L2: ['连接地方格局与历史因果', '说明关键地方如何联系，以及哪些历史变化造就了今天的秩序。'],
+  L3: ['补全居民生活与社会运行', '落实居住、食物、工作、交易、出行、教育、治疗和现实危险。'],
+  L4: ['整理关键名称与查阅条目', '只保留理解整个世界不可缺少的名称，并建立与正文的关联。'],
+};
+const seedGenerationStages = [
+  ['输入与约束', '已整理并发送给模型'],
+  ['生成三个世界方向', '建立事实底稿，并比较三个真正不同的方向'],
+  ['检查输入是否进入结果', '核对事实、约束和未知边界'],
+  ['整理可选择卡片', '生成概述、关键差异和选择入口'],
+];
+const auditStages = [
+  ['准备审计材料', '汇总世界正文、世界模型和事实底稿'],
+  ['模型逐项检查', '检查自然规律、时空尺度、历史因果、资源与知识边界'],
+  ['解析审计结果', '读取问题位置、影响和最小修补建议'],
+  ['保存审计报告', '整理通过项并进入一致性审计页面'],
+];
+let detailedLoadingTimer = null;
+let forgeNodeTimer = null;
 
 function showToast(message, duration = 3_600) {
   const toast = $('#toast');
@@ -27,7 +49,16 @@ function showToast(message, duration = 3_600) {
   showToast.timer = window.setTimeout(() => { toast.hidden = true; }, duration);
 }
 
+function resetDetailedLoading() {
+  window.clearInterval(detailedLoadingTimer);
+  detailedLoadingTimer = null;
+  $('#loadingCard').classList.remove('is-detailed');
+  $('#loadingOperation').hidden = true;
+  $('#loadingTrack').dataset.mode = 'progress';
+}
+
 function showLoading(title, detail, progress = 18) {
+  resetDetailedLoading();
   $('#loadingTitle').textContent = title;
   $('#loadingDetail').textContent = detail;
   $('#loadingBar').style.width = `${progress}%`;
@@ -40,7 +71,85 @@ function updateLoading(title, detail, progress) {
   $('#loadingBar').style.width = `${progress}%`;
 }
 
-function hideLoading() { $('#loadingOverlay').hidden = true; }
+function renderLoadingStages(stages, activeIndex) {
+  $('#loadingStages').innerHTML = stages.map(([title, detail], index) => {
+    const status = index < activeIndex ? 'is-done' : index === activeIndex ? 'is-active' : '';
+    const marker = index < activeIndex ? '✓' : String(index + 1).padStart(2, '0');
+    return `<li class="loading-stage ${status}"><i>${marker}</i><span><strong>${title}</strong><small>${detail}</small></span></li>`;
+  }).join('');
+}
+
+function renderSeedLoadingStages(activeIndex) {
+  renderLoadingStages(seedGenerationStages, activeIndex);
+}
+
+function startSeedGenerationLoading(providerName, modelName) {
+  showLoading('正在构建 3 个世界方向', '完整请求已经送达模型，页面会持续显示真实等待时间。', 18);
+  $('#loadingCard').classList.add('is-detailed');
+  $('#loadingOperation').hidden = false;
+  $('#loadingModel').textContent = `${providerName} · ${modelName || '默认模型'}`;
+  $('#loadingTrack').dataset.mode = 'waiting';
+  renderSeedLoadingStages(1);
+  const startedAt = Date.now();
+  const updateElapsed = () => {
+    const seconds = Math.floor((Date.now() - startedAt) / 1_000);
+    $('#loadingElapsed').textContent = `已等待 ${seconds} 秒`;
+    $('#loadingAssurance').textContent = seconds < 15
+      ? '模型正在完成事实底稿和三个方向；返回后会自动校验，无需重复点击。'
+      : seconds < 40
+        ? '模型仍在处理完整请求。系统收到结果后会检查你的输入是否真正进入产出。'
+        : '仍在运行，不是页面卡住。长材料或推理型模型通常需要更长时间。';
+  };
+  updateElapsed();
+  detailedLoadingTimer = window.setInterval(updateElapsed, 1_000);
+}
+
+function advanceSeedGeneration(stage, title, detail, progress) {
+  renderSeedLoadingStages(stage);
+  $('#loadingTrack').dataset.mode = 'progress';
+  updateLoading(title, detail, progress);
+}
+
+function renderAuditLoadingStages(activeIndex) {
+  renderLoadingStages(auditStages, activeIndex);
+}
+
+function startAuditLoading(providerName, modelName) {
+  showLoading('正在做一致性审计', '审计材料已经准备完成，模型正在逐项检查整个世界。', 20);
+  $('#loadingCard').classList.add('is-detailed');
+  $('#loadingOperation').hidden = false;
+  $('#loadingModel').textContent = `${providerName} · ${modelName || '默认模型'}`;
+  $('#loadingTrack').dataset.mode = 'waiting';
+  renderAuditLoadingStages(1);
+  const startedAt = Date.now();
+  const updateElapsed = () => {
+    const seconds = Math.floor((Date.now() - startedAt) / 1_000);
+    $('#loadingElapsed').textContent = `已审计 ${seconds} 秒`;
+    $('#loadingAssurance').textContent = seconds < 15
+      ? '模型正在读取完整正文并逐项核对；结果返回前不会假装完成后续步骤。'
+      : seconds < 45
+        ? '模型仍在检查规律、尺度和历史因果。收到结果后会立即解析问题位置。'
+        : '审计仍在运行，不是页面卡住。世界正文越完整，逐项核对通常越久。';
+  };
+  updateElapsed();
+  detailedLoadingTimer = window.setInterval(updateElapsed, 1_000);
+}
+
+function advanceAuditLoading(stage, title, detail, progress) {
+  renderAuditLoadingStages(stage);
+  $('#loadingTrack').dataset.mode = 'progress';
+  updateLoading(title, detail, progress);
+}
+
+function setSeedGenerationBusy(busy) {
+  $('#generateSeeds').disabled = busy;
+  $('#regenerateCards').disabled = busy;
+}
+
+function hideLoading() {
+  $('#loadingOverlay').hidden = true;
+  resetDetailedLoading();
+}
 
 function setGenerationStatus(message, tone = 'progress') {
   const status = $('#generationStatus');
@@ -105,6 +214,37 @@ function saveModelSettings() {
   window.localStorage.setItem(MODEL_SETTINGS_KEY, JSON.stringify(settings));
 }
 
+function loadModelCredentials() {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(MODEL_CREDENTIALS_KEY) || '{}');
+    return { textByProvider: saved.textByProvider || {}, imageApiKey: saved.imageApiKey || '' };
+  } catch { return { textByProvider: {}, imageApiKey: '' }; }
+}
+
+function saveVisibleCredentials(provider = $('#providerSelect').value) {
+  const saved = loadModelCredentials();
+  const apiKey = normalizeApiKey($('#apiKeyInput').value);
+  const imageApiKey = normalizeApiKey($('#imageApiKeyInput').value);
+  if (apiKey) saved.textByProvider[provider] = apiKey;
+  else delete saved.textByProvider[provider];
+  saved.imageApiKey = imageApiKey;
+  window.localStorage.setItem(MODEL_CREDENTIALS_KEY, JSON.stringify(saved));
+}
+
+function restoreVisibleCredentials(provider = $('#providerSelect').value) {
+  const saved = loadModelCredentials();
+  $('#apiKeyInput').value = saved.textByProvider[provider] || '';
+  $('#imageApiKeyInput').value = saved.imageApiKey || '';
+  state.credentialProvider = provider;
+}
+
+function clearSavedCredentials() {
+  window.localStorage.removeItem(MODEL_CREDENTIALS_KEY);
+  $('#apiKeyInput').value = '';
+  $('#imageApiKeyInput').value = '';
+  showToast('本机保存的模型密钥已清除。');
+}
+
 function snapshotForStorage(lastScreen) {
   return {
     source: { mode: state.source.mode, brief: state.source.brief, ipTier: state.source.ipTier },
@@ -159,6 +299,7 @@ function applyBlueprint(record) {
   $$('#focusGrid input').forEach((input) => { input.checked = state.focuses.includes(input.value); });
   $('#forgeTitle').textContent = '世界正在被解释清楚';
   $('#forgeProgress').innerHTML = '';
+  hideForgeActivity();
   refreshWorldPreview('waiting');
   $('#projectState').textContent = `${record.title} · 正在生长`;
 }
@@ -179,6 +320,8 @@ function restoreSnapshot(record) {
     const completed = FORGE_BATCHES.findIndex((batch) => !state.modules[batch]);
     const completedCount = completed === -1 ? FORGE_BATCHES.length : completed;
     renderForgeProgress(FORGE_BATCHES, completedCount);
+    if (completedCount === FORGE_BATCHES.length) showForgeComplete();
+    else showForgeNode(FORGE_BATCHES[completedCount], completedCount, 'paused');
     $('#resumeForge').hidden = completedCount === FORGE_BATCHES.length;
   }
   if (state.audit) { renderAudit(); setStepEnabled('audit'); }
@@ -291,6 +434,7 @@ function resetDownstream(from = 'cards') {
   if (index <= screens.indexOf('forge')) {
     $('#forgeTitle').textContent = '世界正在被解释清楚';
     $('#forgeProgress').innerHTML = '';
+    hideForgeActivity();
     refreshWorldPreview('waiting');
   }
 }
@@ -467,19 +611,21 @@ async function handleGenerateSeeds() {
   try {
     clearGenerationStatus();
     collectInputs(); validateSource();
+    const config = validateLiveConfig(modelConfig());
+    const providerName = $('#providerSelect option:checked')?.textContent || '真实模型';
+    startSeedGenerationLoading(providerName, config.model);
+    setSeedGenerationBusy(true);
     if (!state.currentWorldId) {
       const project = await createBlankWorld();
       state.currentWorldId = project.id;
     }
     resetDownstream('cards');
-    showLoading('正在整理三个世界方向', state.source.mode === 'book' ? '只比较三种还原视角，完整世界将在选择后展开。' : '只生成世界观概述和关键差异，完整世界将在选择后展开。', 18);
-    const config = validateLiveConfig(modelConfig());
-    const providerName = $('#providerSelect option:checked')?.textContent || '真实模型';
-    setGenerationStatus(`正在通过${providerName}生成三份世界观概述。首次响应可能需要几十秒，请不要重复点击。`);
+    setGenerationStatus(`正在通过${providerName}生成三份世界观概述；等待时间和处理内容会显示在页面中。`);
     const response = await api.generate('seeds', {
       source: { ...state.source, bookSample: state.source.book?.sample }, dials: state.dials, tone: state.tone, focuses: state.focuses,
       purpose: state.purpose, skin: state.skin, buildIntent: state.buildIntent,
     }, config);
+    advanceSeedGeneration(2, '模型已经返回，正在检查结果', '确认三个方向完整，并核对用户输入是否真正影响结果。', 72);
     const result = parseModelJson(response.text);
     if (!Array.isArray(result.cards) || result.cards.length < 3) throw new Error('模型没有返回 3 个完整世界模型。');
     state.triage = result.triage ?? {};
@@ -489,14 +635,16 @@ async function handleGenerateSeeds() {
       const reason = constructionMode === 'reconstruct' ? '材料事实底稿' : '用户输入约束';
       throw new Error(`模型没有返回${reason}。请重试；系统不会在输入没有进入结果时继续生成完整世界。`);
     }
+    advanceSeedGeneration(3, '输入约束已经确认', '正在把三个方向整理成可以直接比较的世界模型卡片。', 88);
     state.cards = result.cards.slice(0, 3).map(normalizeCard);
+    advanceSeedGeneration(4, '三个世界方向已经完成', '即将进入选择页面。', 100);
     clearGenerationStatus();
     renderSeedCards(); setStepEnabled('cards'); navigate('cards'); await saveCurrentWorld('cards');
   } catch (error) {
     setGenerationStatus(`生成未完成：${error.message}`, 'error');
     showToast(error.message, 12_000);
   }
-  finally { hideLoading(); }
+  finally { setSeedGenerationBusy(false); hideLoading(); }
 }
 
 function renderForgeProgress(batches, activeIndex = -1, errorIndex = -1) {
@@ -507,13 +655,78 @@ function renderForgeProgress(batches, activeIndex = -1, errorIndex = -1) {
   }).join('');
 }
 
+function stopForgeNodeTimer() {
+  window.clearInterval(forgeNodeTimer);
+  forgeNodeTimer = null;
+}
+
+function forgeNextLabel(index) {
+  const nextBatch = FORGE_BATCHES[index + 1];
+  return nextBatch ? `下一节点：${batchLabels[nextBatch][0]}` : '下一步：一致性审计';
+}
+
+function showForgeNode(batch, index, stateName = 'active', message = '') {
+  stopForgeNodeTimer();
+  const activity = $('#forgeActivity');
+  const [title, detail] = forgeNodeDetails[batch];
+  activity.hidden = false;
+  activity.dataset.state = stateName;
+  activity.setAttribute('aria-busy', String(stateName === 'active'));
+  $('#forgeNodeCode').textContent = `${stateName === 'error' ? '未完成' : stateName === 'paused' ? '等待继续' : '正在进行'} · 节点 ${String(index + 1).padStart(2, '0')} / ${String(FORGE_BATCHES.length).padStart(2, '0')}`;
+  $('#forgeNodeTitle').textContent = `${stateName === 'paused' ? '等待继续：' : stateName === 'error' ? '节点中断：' : '正在'}${title}`;
+  $('#forgeNodeDetail').textContent = message || detail;
+  $('#forgeNodeCompleted').textContent = `已完成 ${index} / ${FORGE_BATCHES.length}`;
+  $('#forgeNodeNext').textContent = stateName === 'error' || stateName === 'paused' ? '点击“从中断处继续”后会从这里恢复' : forgeNextLabel(index);
+  $('#forgeNodeElapsed').textContent = stateName === 'paused' ? '等待操作' : stateName === 'error' ? '已停止' : '已等待 0 秒';
+  if (stateName !== 'active') return;
+
+  const startedAt = Date.now();
+  forgeNodeTimer = window.setInterval(() => {
+    const seconds = Math.floor((Date.now() - startedAt) / 1_000);
+    $('#forgeNodeElapsed').textContent = `已等待 ${seconds} 秒`;
+    if (seconds >= 45) $('#forgeNodeDetail').textContent = `${detail} 当前节点仍在生成，不是页面卡住。`;
+    else if (seconds >= 20) $('#forgeNodeDetail').textContent = `${detail} 模型仍在撰写并保持与前文一致。`;
+  }, 1_000);
+}
+
+function showForgeNodeCheck(batch, index) {
+  stopForgeNodeTimer();
+  $('#forgeActivity').dataset.state = 'checking';
+  $('#forgeActivity').setAttribute('aria-busy', 'true');
+  $('#forgeNodeCode').textContent = `正在校验 · 节点 ${String(index + 1).padStart(2, '0')} / ${String(FORGE_BATCHES.length).padStart(2, '0')}`;
+  $('#forgeNodeTitle').textContent = `正在检查${forgeNodeDetails[batch][0]}`;
+  $('#forgeNodeDetail').textContent = '模型已经返回；正在检查必要章节、正文长度和与前文的连续性。';
+  $('#forgeNodeNext').textContent = '校验通过后会保存正文并进入下一节点';
+}
+
+function showForgeComplete() {
+  stopForgeNodeTimer();
+  const activity = $('#forgeActivity');
+  activity.hidden = false;
+  activity.dataset.state = 'complete';
+  activity.setAttribute('aria-busy', 'false');
+  $('#forgeNodeCode').textContent = '正文构建完成 · 04 / 04';
+  $('#forgeNodeElapsed').textContent = '全部节点已保存';
+  $('#forgeNodeTitle').textContent = '完整世界正文已经构建';
+  $('#forgeNodeDetail').textContent = '整体概览、运转方式、地方与历史、居民生活和重要名称均已完成。';
+  $('#forgeNodeCompleted').textContent = '已完成 4 / 4';
+  $('#forgeNodeNext').textContent = '下一步：一致性审计';
+}
+
+function hideForgeActivity() {
+  stopForgeNodeTimer();
+  $('#forgeActivity').hidden = true;
+  $('#forgeActivity').removeAttribute('aria-busy');
+  delete $('#forgeActivity').dataset.state;
+}
+
 function refreshWorldPreview(emptyState = 'waiting') {
   if (state.world) {
     $('#worldPreview').innerHTML = renderMarkdown(state.world);
     return;
   }
   const building = emptyState === 'building';
-  $('#worldPreview').innerHTML = `<div class="empty-state"><svg><use href="#i-layers"/></svg><strong>${building ? '正在构建这个世界' : '等待选择世界模型'}</strong><span>${building ? '新内容会按整体概览、运转方式、地方与历史、日常生活和重要名称依次出现。' : '选中后，这里会依照因果顺序构建完整世界。'}</span></div>`;
+  $('#worldPreview').innerHTML = `<div class="empty-state"><svg><use href="#i-layers"/></svg><strong>${building ? '正在构建这个世界' : '等待选择世界模型'}</strong><span>${building ? '每完成一个节点，新的世界正文就会出现在这里。上方会持续显示当前正在进行的工作。' : '选中后，这里会依照因果顺序构建完整世界。'}</span></div>`;
 }
 
 async function selectSeed(index) {
@@ -525,6 +738,7 @@ async function selectSeed(index) {
   $('#forgeTitle').textContent = `正在解释「${state.selectedSeed.name}」`;
   refreshWorldPreview('building');
   renderForgeProgress(FORGE_BATCHES, 0);
+  showForgeNode(FORGE_BATCHES[0], 0, 'paused', '世界模型已经选定，正在准备第一个正文节点。');
   setStepEnabled('forge'); navigate('forge');
   await saveCurrentWorld('forge');
   await expandWorld(true);
@@ -539,10 +753,13 @@ async function expandWorld(restart = false) {
   $('#resumeForge').disabled = true;
   renderForgeProgress(FORGE_BATCHES, startIndex);
   try {
+    const config = validateLiveConfig(modelConfig());
     for (let index = startIndex; index < FORGE_BATCHES.length; index += 1) {
       const batch = FORGE_BATCHES[index];
       renderForgeProgress(FORGE_BATCHES, index);
-      const response = await api.generate('expand', { batch, seed: state.selectedSeed, sourceDossier: state.sourceDossier, previous: state.world }, validateLiveConfig(modelConfig()));
+      showForgeNode(batch, index);
+      const response = await api.generate('expand', { batch, seed: state.selectedSeed, sourceDossier: state.sourceDossier, previous: state.world }, config);
+      showForgeNodeCheck(batch, index);
       const markdown = cleanModelMarkdown(response.text);
       const validation = validateWorldModule(batch, markdown);
       if (!validation.ok) throw new Error(`${batchLabels[batch][0]}不完整：${validation.problems.join('；')}。`);
@@ -552,10 +769,13 @@ async function expandWorld(restart = false) {
       await saveCurrentWorld('forge');
     }
     renderForgeProgress(FORGE_BATCHES, FORGE_BATCHES.length);
+    showForgeComplete();
     await runAudit(true);
   } catch (error) {
     const failedIndex = FORGE_BATCHES.findIndex((batch) => !state.modules[batch]);
-    renderForgeProgress(FORGE_BATCHES, -1, failedIndex);
+    const targetIndex = failedIndex === -1 ? Math.min(startIndex, FORGE_BATCHES.length - 1) : failedIndex;
+    renderForgeProgress(FORGE_BATCHES, -1, targetIndex);
+    showForgeNode(FORGE_BATCHES[targetIndex], targetIndex, 'error', error.message);
     $('#resumeForge').hidden = false;
     showToast(`展开中断：${error.message}`, 6_000);
   } finally {
@@ -566,10 +786,15 @@ async function expandWorld(restart = false) {
 async function runAudit(autoNavigate = false) {
   try {
     if (!state.world) throw new Error('世界正文尚未生成。');
-    showLoading('正在做一致性审计', '检查自然规律、时空尺度、历史因果、资源与知识边界。', 44);
-    const response = await api.generate('lint', { seed: state.selectedSeed, sourceDossier: state.sourceDossier, world: state.world }, validateLiveConfig(modelConfig()));
+    const config = validateLiveConfig(modelConfig());
+    const providerName = $('#providerSelect option:checked')?.textContent || '真实模型';
+    startAuditLoading(providerName, config.model);
+    const response = await api.generate('lint', { seed: state.selectedSeed, sourceDossier: state.sourceDossier, world: state.world }, config);
+    advanceAuditLoading(2, '模型检查已经完成', '正在解析问题位置、影响范围和最小修补建议。', 72);
     state.audit = parseModelJson(response.text);
+    advanceAuditLoading(3, '审计结果已经读懂', '正在整理通过项、问题清单并保存本次报告。', 88);
     renderAudit(); setStepEnabled('audit'); await saveCurrentWorld('audit');
+    advanceAuditLoading(4, '一致性审计已经完成', '审计报告已保存，即将进入结果页面。', 100);
     if (autoNavigate) navigate('audit');
   } catch (error) { showToast(error.message, 5_000); }
   finally { hideLoading(); }
@@ -577,25 +802,77 @@ async function runAudit(autoNavigate = false) {
 
 function renderAudit() {
   const audit = state.audit ?? { score: 0, status: '未审计', violations: [], passed_rules: [] };
-  const violations = Array.isArray(audit.violations) ? audit.violations : [];
+  const violations = getAuditViolations(audit);
   $('#auditHero').innerHTML = `<div class="score-ring" style="--score:${Number(audit.score) || 0}"><span>${escapeHtml(audit.score || 0)}<small>STRUCTURE</small></span></div><div class="audit-summary"><h3>${escapeHtml(audit.status)}</h3><p>${escapeHtml(audit.untapped_potential || '没有发现结构性硬伤。')}</p></div>`;
   $('#violationCount').textContent = `${violations.length} 项`;
   $('#violationsList').innerHTML = violations.length ? violations.map((item) => `<article class="violation"><svg><use href="#i-alert"/></svg><div><strong>${escapeHtml(item.rule)} · ${escapeHtml(item.location)}</strong><p>${escapeHtml(item.problem)}</p><small>最小修补：${escapeHtml(item.minimal_fix)}</small></div></article>`).join('') : '<div class="passed-list"><span class="passed-rule"><svg><use href="#i-check"/></svg>没有硬性违规</span></div>';
   $('#passedRules').innerHTML = (audit.passed_rules ?? []).map((rule) => `<span class="passed-rule"><svg><use href="#i-check"/></svg>${escapeHtml(rule)}</span>`).join('');
-  $('#repairWorld').hidden = violations.length === 0;
+  const repairButton = $('#repairWorld');
+  repairButton.hidden = violations.length === 0;
+  $('span', repairButton).textContent = violations.length ? `让 AI 自主修补 ${violations.length} 项问题` : '审计已通过';
+}
+
+async function runAutonomousRepairAttempt(config, attempt) {
+  updateLoading('AI 正在自主修补', `第 ${attempt} 轮：修补当前剩余的 ${getAuditViolations(state.audit).length} 项问题。`, 12 + attempt * 14);
+  const response = await api.generate('repair', { seed: state.selectedSeed, sourceDossier: state.sourceDossier, world: state.world, audit: state.audit }, config);
+  const repairedWorld = cleanModelMarkdown(response.text);
+  if (!repairedWorld || repairedWorld === state.world) return null;
+
+  updateLoading('正在复核修补结果', `第 ${attempt} 轮：确认修改是否解决问题且没有引入新矛盾。`, 20 + attempt * 16);
+  const auditResponse = await api.generate('lint', { seed: state.selectedSeed, sourceDossier: state.sourceDossier, world: repairedWorld }, config);
+  const nextAudit = parseModelJson(auditResponse.text);
+  return {
+    world: repairedWorld,
+    audit: hasAuditPassed(nextAudit) ? { ...nextAudit, status: '通过', violations: [] } : nextAudit,
+  };
 }
 
 async function repairWorld() {
+  let completedAttempts = 0;
+  let stalledAttempts = 0;
   try {
-    showLoading('正在做最小修补', '只改违规位置，不动选定的世界模型。', 35);
+    showLoading('AI 正在自主修补', '只改审计指出的问题；每轮修补后都会重新检查。', 18);
     const config = validateLiveConfig(modelConfig());
-    const response = await api.generate('repair', { seed: state.selectedSeed, sourceDossier: state.sourceDossier, world: state.world, audit: state.audit }, config);
-    state.world = cleanModelMarkdown(response.text);
-    updateLoading('正在复核修补结果', '确认补丁没有带来新矛盾。', 70);
-    const auditResponse = await api.generate('lint', { seed: state.selectedSeed, sourceDossier: state.sourceDossier, world: state.world }, config);
-    state.audit = parseModelJson(auditResponse.text);
-    renderAudit(); await finalizeWorld();
-  } catch (error) { showToast(error.message, 5_000); }
+    let previousBurden = getAuditBurden(state.audit);
+    let previousScore = Number(state.audit?.score) || 0;
+
+    for (let attempt = 1; attempt <= MAX_AUTONOMOUS_REPAIR_ATTEMPTS; attempt += 1) {
+      completedAttempts = attempt;
+      const result = await runAutonomousRepairAttempt(config, attempt);
+      if (!result) {
+        navigate('audit');
+        showToast('AI 没有产生有效修改，已停止自动重试并保留当前版本。', 10_000);
+        return;
+      }
+
+      state.world = result.world;
+      state.audit = result.audit;
+      renderAudit();
+      await saveCurrentWorld('audit');
+
+      if (hasAuditPassed(state.audit)) {
+        updateLoading('自主修补已通过', `经过 ${attempt} 轮修补，正在整理最终世界档案。`, 92);
+        await finalizeWorld();
+        return;
+      }
+
+      const currentBurden = getAuditBurden(state.audit);
+      const currentScore = Number(state.audit?.score) || 0;
+      const improved = currentBurden < previousBurden || currentScore > previousScore;
+      stalledAttempts = improved ? 0 : stalledAttempts + 1;
+      previousBurden = currentBurden;
+      previousScore = currentScore;
+      if (stalledAttempts >= 2) break;
+    }
+
+    navigate('audit');
+    const remaining = getAuditViolations(state.audit).length;
+    const stopReason = stalledAttempts >= 2 ? '连续两轮没有改善' : '达到安全重试上限';
+    showToast(`AI 已自主尝试 ${completedAttempts} 轮，因${stopReason}而停止。当前版本和剩余 ${remaining} 项问题已保留。`, 12_000);
+  } catch (error) {
+    navigate('audit');
+    showToast(`自主修补中断：${error.message}。当前已完成的修改已保留。`, 12_000);
+  }
   finally { hideLoading(); }
 }
 
@@ -745,9 +1022,16 @@ function bindEvents() {
   $$('.step-link').forEach((button) => button.addEventListener('click', () => { if (!button.disabled) navigate(button.dataset.step); }));
   const dialog = $('#settingsDialog');
   ['#openSettings','#openSettingsMobile'].forEach((selector) => $(selector).addEventListener('click', () => dialog.showModal()));
-  $('#providerSelect').addEventListener('change', () => { applyProviderPreset(); updateProviderBadge(); });
+  $('#providerSelect').addEventListener('change', () => {
+    if (state.credentialProvider) saveVisibleCredentials(state.credentialProvider);
+    applyProviderPreset(); restoreVisibleCredentials(); updateProviderBadge();
+  });
   $('#temperatureInput').addEventListener('input', (event) => { $('#temperatureOutput').value = event.target.value; });
-  $('#saveSettings').addEventListener('click', () => { updateProviderBadge(); saveModelSettings(); dialog.close(); showToast('模型设置已应用；密钥只保留在当前页面内存中。'); });
+  $('#clearSavedKeys').addEventListener('click', clearSavedCredentials);
+  $('#saveSettings').addEventListener('click', () => {
+    updateProviderBadge(); saveModelSettings(); saveVisibleCredentials(); dialog.close();
+    showToast('模型设置和密钥已保存在这个本地浏览器中。');
+  });
 }
 
 async function init() {
@@ -770,6 +1054,7 @@ async function init() {
     }
     if (savedSettings.imageBaseUrl) $('#imageBaseUrlInput').value = savedSettings.imageBaseUrl;
     if (savedSettings.imageModel) $('#imageModelInput').value = savedSettings.imageModel;
+    restoreVisibleCredentials(savedProvider);
     $('#healthStatus').textContent = `本地服务 ${health.version} 已连接`;
   } catch (error) {
     $('#healthStatus').textContent = '本地服务未连接';

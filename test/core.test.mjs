@@ -6,7 +6,7 @@ import { extractBook, sampleBookText } from '../lib/extractors.mjs';
 import { buildPrompt } from '../lib/prompts.mjs';
 import { callImageModel, callTextModel, providerPresets } from '../lib/providers.mjs';
 import { buildStandaloneWiki, exportData, getVisuals } from '../public/js/exporters.js';
-import { countSourceDossierFacts, normalizeSourceDossier, renderMarkdown, validateWorldModule } from '../public/js/utils.js';
+import { countSourceDossierFacts, getAuditBurden, getAuditViolations, hasAuditPassed, normalizeSourceDossier, renderMarkdown, validateWorldModule } from '../public/js/utils.js';
 import { canDeleteWorld } from '../public/js/world-store.js';
 
 test('纯文本书籍可提取并归一化', async () => {
@@ -589,6 +589,31 @@ test('审阅和修补会降低语言门槛并阻止琐碎条目膨胀', () => {
   assert.match(repair, /合并或删除不能帮助理解整体的条目/);
 });
 
+test('审计负担按严重程度计算，只有没有剩余问题才算通过', () => {
+  const audit = {
+    status: '需修补', score: 72,
+    violations: [{ severity: 'high' }, { severity: 'medium' }, { severity: 'low' }],
+  };
+  assert.equal(getAuditViolations(audit).length, 3);
+  assert.equal(getAuditBurden(audit), 7);
+  assert.equal(hasAuditPassed(audit), false);
+  assert.equal(hasAuditPassed({ status: '通过', violations: [] }), true);
+  assert.equal(hasAuditPassed({ status: '通过', violations: [{ severity: 'low' }] }), false);
+});
+
+test('AI 修补会自主复核并循环，无法继续改善时才通知用户', () => {
+  const app = readFileSync(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const repairFlow = app.match(/async function runAutonomousRepairAttempt[\s\S]*?\n}\n\nasync function finalizeWorld/)?.[0] || '';
+  assert.match(app, /MAX_AUTONOMOUS_REPAIR_ATTEMPTS = 4/);
+  assert.match(repairFlow, /for \(let attempt = 1; attempt <= MAX_AUTONOMOUS_REPAIR_ATTEMPTS/);
+  assert.match(repairFlow, /api\.generate\('repair'/);
+  assert.match(repairFlow, /api\.generate\('lint'/);
+  assert.match(repairFlow, /if \(hasAuditPassed\(state\.audit\)\)/);
+  assert.match(repairFlow, /stalledAttempts >= 2/);
+  assert.match(repairFlow, /await finalizeWorld\(\)/);
+  assert.ok(repairFlow.indexOf('hasAuditPassed(state.audit)') < repairFlow.indexOf('await finalizeWorld()'));
+});
+
 test('世界覆盖范围与呈现取向采用常规软偏好，不再用数值或片段硬定气质', () => {
   const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
   const store = readFileSync(new URL('../public/js/world-store.js', import.meta.url), 'utf8');
@@ -626,8 +651,29 @@ test('候选阶段只展示三份世界观概述，完整世界在选择后展�
   assert.match(renderCards, /overview-facets/);
   assert.match(renderCards, /再生成完整世界之书/);
   assert.doesNotMatch(renderCards, /book-spine|axiom-list|unknown-row/);
-  assert.match(app, /showLoading\('正在整理三个世界方向'/);
-  assert.match(app, /完整世界将在选择后展开/);
+  assert.match(app, /startSeedGenerationLoading\(providerName, config\.model\)/);
+  assert.match(app, /正在构建 3 个世界方向/);
+});
+
+test('生成三个世界方向时展示真实等待时间、工作内容和完成状态', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const components = readFileSync(new URL('../public/styles/components.css', import.meta.url), 'utf8');
+  const flow = app.match(/async function handleGenerateSeeds\(\)[\s\S]*?\n}\n\nfunction renderForgeProgress/)?.[0] || '';
+  assert.match(html, /id="loadingElapsed"/);
+  assert.match(html, /id="loadingStages"/);
+  assert.match(app, /输入与约束/);
+  assert.match(app, /生成三个世界方向/);
+  assert.match(app, /检查输入是否进入结果/);
+  assert.match(app, /整理可选择卡片/);
+  assert.match(app, /已等待 \$\{seconds\} 秒/);
+  assert.match(app, /不是页面卡住/);
+  assert.match(flow, /setSeedGenerationBusy\(true\)/);
+  assert.match(flow, /advanceSeedGeneration\(2/);
+  assert.match(flow, /advanceSeedGeneration\(3/);
+  assert.match(flow, /advanceSeedGeneration\(4/);
+  assert.ok(flow.indexOf("await api.generate('seeds'") < flow.indexOf('advanceSeedGeneration(2'));
+  assert.match(components, /loading-track\[data-mode="waiting"\]/);
 });
 
 test('完整世界分批保存并能从中断处继续，不会重写已经完成的部分', () => {
@@ -639,6 +685,45 @@ test('完整世界分批保存并能从中断处继续，不会重写已经完�
   assert.match(app, /await saveCurrentWorld\('forge'\)/);
   assert.match(app, /\$\('#resumeForge'\)\.hidden = false/);
   assert.match(app, /\$\('#resumeForge'\)\.addEventListener\('click', \(\) => expandWorld\(false\)\)/);
+});
+
+test('构建完整世界时逐节点展示当前工作、真实等待时间和失败位置', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  const app = readFileSync(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const components = readFileSync(new URL('../public/styles/components.css', import.meta.url), 'utf8');
+  const expandFlow = app.match(/async function expandWorld\(restart = false\)[\s\S]*?\n}\n\nasync function runAudit/)?.[0] || '';
+  assert.match(html, /id="forgeActivity"/);
+  assert.match(html, /id="forgeNodeElapsed"/);
+  assert.match(html, /id="forgeNodeCompleted"/);
+  assert.match(app, /建立整体认识与运转方式/);
+  assert.match(app, /连接地方格局与历史因果/);
+  assert.match(app, /补全居民生活与社会运行/);
+  assert.match(app, /整理关键名称与查阅条目/);
+  assert.match(app, /当前节点仍在生成，不是页面卡住/);
+  assert.ok(expandFlow.indexOf('showForgeNode(batch, index)') < expandFlow.indexOf("await api.generate('expand'"));
+  assert.ok(expandFlow.indexOf("await api.generate('expand'") < expandFlow.indexOf('showForgeNodeCheck(batch, index)'));
+  assert.match(expandFlow, /showForgeComplete\(\)/);
+  assert.match(expandFlow, /showForgeNode\(FORGE_BATCHES\[targetIndex\], targetIndex, 'error'/);
+  assert.match(app, /showForgeNode\(FORGE_BATCHES\[completedCount\], completedCount, 'paused'\)/);
+  assert.match(components, /forge-activity\[data-state="complete"\]/);
+  assert.match(components, /forge-activity\[data-state="error"\]/);
+});
+
+test('一致性审计持续展示真实节点和实际等待时间', () => {
+  const app = readFileSync(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  const auditFlow = app.match(/async function runAudit\(autoNavigate = false\)[\s\S]*?\n}\n\nfunction renderAudit/)?.[0] || '';
+  assert.match(html, /aria-label="操作进度"/);
+  assert.match(app, /准备审计材料/);
+  assert.match(app, /模型逐项检查/);
+  assert.match(app, /解析审计结果/);
+  assert.match(app, /保存审计报告/);
+  assert.match(app, /已审计 \$\{seconds\} 秒/);
+  assert.match(app, /审计仍在运行，不是页面卡住/);
+  assert.ok(auditFlow.indexOf('startAuditLoading(providerName, config.model)') < auditFlow.indexOf("await api.generate('lint'"));
+  assert.ok(auditFlow.indexOf("await api.generate('lint'") < auditFlow.indexOf('advanceAuditLoading(2'));
+  assert.ok(auditFlow.indexOf('parseModelJson(response.text)') < auditFlow.indexOf('advanceAuditLoading(3'));
+  assert.ok(auditFlow.indexOf("await saveCurrentWorld('audit')") < auditFlow.indexOf('advanceAuditLoading(4'));
 });
 
 test('开始构建新世界时会立刻清空上一世界的正文预览', () => {
@@ -664,6 +749,22 @@ test('正式生成支持系统代理、持久错误提示和旧候选卡恢复',
   assert.match(app, /\(snapshot\.cards \|\| \[\]\)\.map\(normalizeCard\)/);
   assert.match(saveSettings, /provider:|baseUrl:|model:|temperature:/);
   assert.doesNotMatch(saveSettings, /apiKeyInput|imageApiKeyInput/);
+});
+
+test('模型密钥按服务商保存在本机浏览器，不进入普通设置、世界存档或源码常量', () => {
+  const app = readFileSync(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  const saveSettings = app.match(/function saveModelSettings\(\)[\s\S]*?\n}/)?.[0] || '';
+  const saveCredentials = app.match(/function saveVisibleCredentials[\s\S]*?\n}/)?.[0] || '';
+  const snapshot = app.match(/function snapshotForStorage[\s\S]*?\n}/)?.[0] || '';
+  assert.match(app, /MODEL_CREDENTIALS_KEY = 'world-axiom-model-credentials-v1'/);
+  assert.match(saveCredentials, /textByProvider\[provider\]/);
+  assert.match(saveCredentials, /imageApiKey/);
+  assert.doesNotMatch(saveSettings, /apiKeyInput|imageApiKeyInput|MODEL_CREDENTIALS_KEY/);
+  assert.doesNotMatch(snapshot, /apiKey|credentials/i);
+  assert.match(app, /restoreVisibleCredentials\(savedProvider\)/);
+  assert.match(app, /localStorage\.removeItem\(MODEL_CREDENTIALS_KEY\)/);
+  assert.match(html, /不会写入源码、日志、世界存档、导出文件或远端仓库/);
 });
 
 test('产品只使用真实模型，不再保留演示模式或演示生成分支', () => {
