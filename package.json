@@ -1,0 +1,19 @@
+{
+  "name": "world-axiom-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "从简要说明或书籍生成可查阅、可追溯的世界之书，并导出图文 Wiki、简版与结构化数据。",
+  "scripts": {
+    "start": "node start.mjs",
+    "test": "node --test --test-isolation=none",
+    "check": "node --check start.mjs && node --check server.mjs && node --check lib/providers.mjs && node --check lib/extractors.mjs && node --check lib/prompts.mjs && node --check public/js/app.js && node --check public/js/api.js && node --check public/js/exporters.js && node --check public/js/utils.js && node --check public/js/world-store.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "adm-zip": "0.5.16",
+    "pdf-parse": "1.1.1"
+  }
+}
