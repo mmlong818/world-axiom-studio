@@ -18,8 +18,9 @@ const state = {
 
 const screens = ['library', 'input', 'cards', 'forge', 'audit', 'export'];
 const FORGE_BATCHES = ['L1', 'L2', 'L3', 'L4'];
+const FORGE_FLOW_STEPS = [...FORGE_BATCHES, 'AUDIT'];
 const MAX_AUTONOMOUS_REPAIR_ATTEMPTS = 4;
-const batchLabels = { L1: ['第一、二部分 · 世界概览', '前提 · 运转 · 常识'], L2: ['第三、四部分 · 地方与历史', '关系 · 转折 · 当下'], L3: ['第五部分 · 人们怎样生活', '社会 · 生计 · 日常'], L4: ['第六部分 · 重要名称', '关键条目 · 关联 · 索引'] };
+const batchLabels = { L1: ['第一、二部分 · 世界概览', '前提 · 运转 · 常识'], L2: ['第三、四部分 · 地方与历史', '关系 · 转折 · 当下'], L3: ['第五部分 · 人们怎样生活', '社会 · 生计 · 日常'], L4: ['第六部分 · 重要名称', '关键条目 · 关联 · 索引'], AUDIT: ['第五步 · 一致性审计', '规律 · 因果 · 风险'] };
 const forgeNodeDetails = {
   L1: ['建立整体认识与运转方式', '回答这是什么世界、首先能看到什么，以及核心规则怎样影响普通生活。'],
   L2: ['连接地方格局与历史因果', '说明关键地方如何联系，以及哪些历史变化造就了今天的秩序。'],
@@ -319,8 +320,8 @@ function restoreSnapshot(record) {
     updateCompass(state.selectedSeed); setStepEnabled('forge'); refreshWorldPreview();
     const completed = FORGE_BATCHES.findIndex((batch) => !state.modules[batch]);
     const completedCount = completed === -1 ? FORGE_BATCHES.length : completed;
-    renderForgeProgress(FORGE_BATCHES, completedCount);
-    if (completedCount === FORGE_BATCHES.length) showForgeComplete();
+    renderForgeProgress(FORGE_FLOW_STEPS, completedCount === FORGE_BATCHES.length && state.audit ? FORGE_FLOW_STEPS.length : completedCount);
+    if (completedCount === FORGE_BATCHES.length) showForgeAuditState(state.audit ? 'complete' : 'active');
     else showForgeNode(FORGE_BATCHES[completedCount], completedCount, 'paused');
     $('#resumeForge').hidden = completedCount === FORGE_BATCHES.length;
   }
@@ -661,8 +662,8 @@ function stopForgeNodeTimer() {
 }
 
 function forgeNextLabel(index) {
-  const nextBatch = FORGE_BATCHES[index + 1];
-  return nextBatch ? `下一节点：${batchLabels[nextBatch][0]}` : '下一步：一致性审计';
+  const nextBatch = FORGE_FLOW_STEPS[index + 1];
+  return nextBatch ? `下一节点：${batchLabels[nextBatch][0]}` : '下一步：查看审计结果';
 }
 
 function showForgeNode(batch, index, stateName = 'active', message = '') {
@@ -672,10 +673,10 @@ function showForgeNode(batch, index, stateName = 'active', message = '') {
   activity.hidden = false;
   activity.dataset.state = stateName;
   activity.setAttribute('aria-busy', String(stateName === 'active'));
-  $('#forgeNodeCode').textContent = `${stateName === 'error' ? '未完成' : stateName === 'paused' ? '等待继续' : '正在进行'} · 节点 ${String(index + 1).padStart(2, '0')} / ${String(FORGE_BATCHES.length).padStart(2, '0')}`;
+  $('#forgeNodeCode').textContent = `${stateName === 'error' ? '未完成' : stateName === 'paused' ? '等待继续' : '正在进行'} · 节点 ${String(index + 1).padStart(2, '0')} / ${String(FORGE_FLOW_STEPS.length).padStart(2, '0')}`;
   $('#forgeNodeTitle').textContent = `${stateName === 'paused' ? '等待继续：' : stateName === 'error' ? '节点中断：' : '正在'}${title}`;
   $('#forgeNodeDetail').textContent = message || detail;
-  $('#forgeNodeCompleted').textContent = `已完成 ${index} / ${FORGE_BATCHES.length}`;
+  $('#forgeNodeCompleted').textContent = `已完成 ${index} / ${FORGE_FLOW_STEPS.length}`;
   $('#forgeNodeNext').textContent = stateName === 'error' || stateName === 'paused' ? '点击“从中断处继续”后会从这里恢复' : forgeNextLabel(index);
   $('#forgeNodeElapsed').textContent = stateName === 'paused' ? '等待操作' : stateName === 'error' ? '已停止' : '已等待 0 秒';
   if (stateName !== 'active') return;
@@ -693,24 +694,26 @@ function showForgeNodeCheck(batch, index) {
   stopForgeNodeTimer();
   $('#forgeActivity').dataset.state = 'checking';
   $('#forgeActivity').setAttribute('aria-busy', 'true');
-  $('#forgeNodeCode').textContent = `正在校验 · 节点 ${String(index + 1).padStart(2, '0')} / ${String(FORGE_BATCHES.length).padStart(2, '0')}`;
+  $('#forgeNodeCode').textContent = `正在校验 · 节点 ${String(index + 1).padStart(2, '0')} / ${String(FORGE_FLOW_STEPS.length).padStart(2, '0')}`;
   $('#forgeNodeTitle').textContent = `正在检查${forgeNodeDetails[batch][0]}`;
   $('#forgeNodeDetail').textContent = '模型已经返回；正在检查必要章节、正文长度和与前文的连续性。';
   $('#forgeNodeNext').textContent = '校验通过后会保存正文并进入下一节点';
 }
 
-function showForgeComplete() {
+function showForgeAuditState(stateName = 'active', message = '') {
   stopForgeNodeTimer();
   const activity = $('#forgeActivity');
   activity.hidden = false;
-  activity.dataset.state = 'complete';
-  activity.setAttribute('aria-busy', 'false');
-  $('#forgeNodeCode').textContent = '正文构建完成 · 04 / 04';
-  $('#forgeNodeElapsed').textContent = '全部节点已保存';
-  $('#forgeNodeTitle').textContent = '完整世界正文已经构建';
-  $('#forgeNodeDetail').textContent = '整体概览、运转方式、地方与历史、居民生活和重要名称均已完成。';
-  $('#forgeNodeCompleted').textContent = '已完成 4 / 4';
-  $('#forgeNodeNext').textContent = '下一步：一致性审计';
+  const complete = stateName === 'complete';
+  const failed = stateName === 'error';
+  activity.dataset.state = complete ? 'complete' : failed ? 'error' : 'checking';
+  activity.setAttribute('aria-busy', String(!complete && !failed));
+  $('#forgeNodeCode').textContent = `${complete ? '全部完成' : failed ? '审计中断' : '正在进行'} · 节点 05 / 05`;
+  $('#forgeNodeElapsed').textContent = complete ? '审计报告已保存' : failed ? '等待重新审计' : '正文 4 个节点已保存';
+  $('#forgeNodeTitle').textContent = complete ? '世界正文与一致性审计均已完成' : failed ? '一致性审计没有完成' : '正在进入一致性审计';
+  $('#forgeNodeDetail').textContent = message || (complete ? '世界的规律、尺度、历史因果、资源与知识边界已经完成检查。' : failed ? '正文已经安全保存，可以从审计页面重新检查。' : '完整正文已经构建；接下来检查规律、尺度、历史因果和知识边界。');
+  $('#forgeNodeCompleted').textContent = `已完成 ${complete ? 5 : 4} / 5`;
+  $('#forgeNodeNext').textContent = complete ? '下一步：查看审计结果' : failed ? '下一步：重新审计' : '审计过程会继续分阶段展示进度';
 }
 
 function hideForgeActivity() {
@@ -737,7 +740,7 @@ async function selectSeed(index) {
   updateCompass(state.selectedSeed);
   $('#forgeTitle').textContent = `正在解释「${state.selectedSeed.name}」`;
   refreshWorldPreview('building');
-  renderForgeProgress(FORGE_BATCHES, 0);
+  renderForgeProgress(FORGE_FLOW_STEPS, 0);
   showForgeNode(FORGE_BATCHES[0], 0, 'paused', '世界模型已经选定，正在准备第一个正文节点。');
   setStepEnabled('forge'); navigate('forge');
   await saveCurrentWorld('forge');
@@ -751,12 +754,12 @@ async function expandWorld(restart = false) {
   const startIndex = firstMissing === -1 ? FORGE_BATCHES.length : firstMissing;
   $('#resumeForge').hidden = true;
   $('#resumeForge').disabled = true;
-  renderForgeProgress(FORGE_BATCHES, startIndex);
+  renderForgeProgress(FORGE_FLOW_STEPS, startIndex);
   try {
     const config = validateLiveConfig(modelConfig());
     for (let index = startIndex; index < FORGE_BATCHES.length; index += 1) {
       const batch = FORGE_BATCHES[index];
-      renderForgeProgress(FORGE_BATCHES, index);
+      renderForgeProgress(FORGE_FLOW_STEPS, index);
       showForgeNode(batch, index);
       const response = await api.generate('expand', { batch, seed: state.selectedSeed, sourceDossier: state.sourceDossier, previous: state.world }, config);
       showForgeNodeCheck(batch, index);
@@ -768,13 +771,13 @@ async function expandWorld(restart = false) {
       refreshWorldPreview();
       await saveCurrentWorld('forge');
     }
-    renderForgeProgress(FORGE_BATCHES, FORGE_BATCHES.length);
-    showForgeComplete();
+    renderForgeProgress(FORGE_FLOW_STEPS, FORGE_BATCHES.length);
+    showForgeAuditState('active');
     await runAudit(true);
   } catch (error) {
     const failedIndex = FORGE_BATCHES.findIndex((batch) => !state.modules[batch]);
     const targetIndex = failedIndex === -1 ? Math.min(startIndex, FORGE_BATCHES.length - 1) : failedIndex;
-    renderForgeProgress(FORGE_BATCHES, -1, targetIndex);
+    renderForgeProgress(FORGE_FLOW_STEPS, -1, targetIndex);
     showForgeNode(FORGE_BATCHES[targetIndex], targetIndex, 'error', error.message);
     $('#resumeForge').hidden = false;
     showToast(`展开中断：${error.message}`, 6_000);
@@ -794,9 +797,17 @@ async function runAudit(autoNavigate = false) {
     state.audit = parseModelJson(response.text);
     advanceAuditLoading(3, '审计结果已经读懂', '正在整理通过项、问题清单并保存本次报告。', 88);
     renderAudit(); setStepEnabled('audit'); await saveCurrentWorld('audit');
+    renderForgeProgress(FORGE_FLOW_STEPS, FORGE_FLOW_STEPS.length);
+    showForgeAuditState('complete');
     advanceAuditLoading(4, '一致性审计已经完成', '审计报告已保存，即将进入结果页面。', 100);
     if (autoNavigate) navigate('audit');
-  } catch (error) { showToast(error.message, 5_000); }
+  } catch (error) {
+    if (state.world && FORGE_BATCHES.every((batch) => state.modules[batch])) {
+      renderForgeProgress(FORGE_FLOW_STEPS, -1, FORGE_BATCHES.length);
+      showForgeAuditState('error', error.message);
+    }
+    showToast(error.message, 5_000);
+  }
   finally { hideLoading(); }
 }
 

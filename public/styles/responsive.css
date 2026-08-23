@@ -37,7 +37,7 @@
   .seed-card-grid { grid-template-columns: 1fr; }
   .seed-card { min-height: 0; }
   .forge-layout { grid-template-columns: 1fr; }
-  .forge-progress { position: static; grid-template-columns: repeat(4,1fr); }
+  .forge-progress { position: static; grid-template-columns: repeat(5,1fr); }
   .forge-step { grid-template-columns: 24px 1fr; padding: 8px; }
   .forge-activity-head, .forge-activity-foot { align-items: flex-start; flex-direction: column; gap: 4px; }
   .audit-grid { grid-template-columns: 1fr; }

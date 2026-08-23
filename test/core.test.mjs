@@ -702,11 +702,27 @@ test('构建完整世界时逐节点展示当前工作、真实等待时间和�
   assert.match(app, /当前节点仍在生成，不是页面卡住/);
   assert.ok(expandFlow.indexOf('showForgeNode(batch, index)') < expandFlow.indexOf("await api.generate('expand'"));
   assert.ok(expandFlow.indexOf("await api.generate('expand'") < expandFlow.indexOf('showForgeNodeCheck(batch, index)'));
-  assert.match(expandFlow, /showForgeComplete\(\)/);
+  assert.match(app, /FORGE_FLOW_STEPS = \[\.\.\.FORGE_BATCHES, 'AUDIT'\]/);
+  assert.match(app, /第五步 · 一致性审计/);
+  assert.match(expandFlow, /showForgeAuditState\('active'\)/);
+  assert.match(app, /showForgeAuditState\('complete'\)/);
   assert.match(expandFlow, /showForgeNode\(FORGE_BATCHES\[targetIndex\], targetIndex, 'error'/);
   assert.match(app, /showForgeNode\(FORGE_BATCHES\[completedCount\], completedCount, 'paused'\)/);
   assert.match(components, /forge-activity\[data-state="complete"\]/);
   assert.match(components, /forge-activity\[data-state="error"\]/);
+});
+
+test('世界罗盘使用可换行摘要和纵向事实列表，不把长内容塞进圆形图', () => {
+  const html = readFileSync(new URL('../public/index.html', import.meta.url), 'utf8');
+  const base = readFileSync(new URL('../public/styles/base.css', import.meta.url), 'utf8');
+  const components = readFileSync(new URL('../public/styles/components.css', import.meta.url), 'utf8');
+  assert.match(html, /class="compass-kicker"/);
+  assert.match(html, /class="compass-axes"/);
+  assert.doesNotMatch(html, /class="orbit/);
+  assert.match(base, /grid-template-columns: 220px minmax\(0, 1fr\) 360px/);
+  assert.match(components, /\.compass-core span \{[^}]*overflow-wrap: anywhere/);
+  assert.match(components, /\.compass-facts div \{[^}]*display: grid; gap: 5px/);
+  assert.doesNotMatch(components, /\.compass-facts div \{[^}]*grid-template-columns: 92px 1fr/);
 });
 
 test('一致性审计持续展示真实节点和实际等待时间', () => {
