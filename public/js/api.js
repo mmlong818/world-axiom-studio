@@ -96,5 +96,4 @@ export const api = {
   generate: (stage, payload, config, onEvent) => onEvent
     ? requestStream('/api/generate-stream', { method: 'POST', body: JSON.stringify({ stage, payload, config }) }, onEvent)
     : request('/api/generate', { method: 'POST', body: JSON.stringify({ stage, payload, config }) }),
-  generateImage: (prompt, config) => request('/api/image', { method: 'POST', body: JSON.stringify({ prompt, config }) }),
 };

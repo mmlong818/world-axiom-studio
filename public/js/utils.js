@@ -115,7 +115,11 @@ function tableCells(line) {
 }
 
 export function renderMarkdown(markdown) {
-  const lines = String(markdown ?? '').replace(/\r\n?/g, '\n').split('\n');
+  const textOnlyMarkdown = String(markdown ?? '')
+    .replace(/```(?:mermaid|plantuml|graphviz)[\s\S]*?```/gi, '')
+    .replace(/!\[([^\]]*)\]\([^\n)]+\)/g, '$1')
+    .replace(/<\/?(?:img|svg|figure|figcaption|table|thead|tbody|tr|th|td)\b[^>]*>/gi, '');
+  const lines = textOnlyMarkdown.replace(/\r\n?/g, '\n').split('\n');
   const html = [];
   let listType = null;
   const closeList = () => {
@@ -132,13 +136,14 @@ export function renderMarkdown(markdown) {
     if (line.includes('|') && index + 1 < lines.length && isTableSeparator(lines[index + 1])) {
       closeList();
       const headers = tableCells(line);
-      html.push('<div class="table-wrap"><table><thead><tr>', ...headers.map((cell) => `<th>${cell}</th>`), '</tr></thead><tbody>');
+      const rows = [];
       index += 2;
       while (index < lines.length && lines[index].includes('|') && lines[index].trim()) {
-        html.push('<tr>', ...tableCells(lines[index]).map((cell) => `<td>${cell}</td>`), '</tr>');
+        const cells = tableCells(lines[index]);
+        rows.push(headers.map((header, cellIndex) => `<strong>${header}：</strong>${cells[cellIndex] || '—'}`).join('；'));
         index += 1;
       }
-      html.push('</tbody></table></div>');
+      if (rows.length) html.push('<ul>', ...rows.map((row) => `<li>${row}</li>`), '</ul>');
       index -= 1;
       continue;
     }
@@ -228,9 +233,4 @@ export function getAuditBurden(audit) {
 
 export function hasAuditPassed(audit) {
   return getBlockingAuditViolations(audit).length === 0;
-}
-
-export function safeImageSource(value) {
-  const source = String(value ?? '');
-  return /^(?:data:image\/(?:png|jpeg|webp|svg\+xml);base64,|https:\/\/)/i.test(source) ? source : '';
 }

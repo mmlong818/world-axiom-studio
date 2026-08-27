@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extractBook } from './lib/extractors.mjs';
-import { callImageModel, callTextModel, providerPresets } from './lib/providers.mjs';
+import { callTextModel, providerPresets } from './lib/providers.mjs';
 import { discoverModels, testModelConnection } from './lib/model-routing.mjs';
 import { buildPrompt } from './lib/prompts.mjs';
 import { researchIdentifiedSource, validateResearchCoverage } from './lib/research.mjs';
@@ -67,13 +67,13 @@ function stageConfig(config, maxTokens) {
 }
 
 async function callStructuredStage(stage, payload, config, maxTokens, label, onTextDelta) {
-  const { system, prompt } = buildPrompt(stage, payload);
+  const { system, prompt } = buildPrompt(stage, payload, config?.outputLocale);
   const raw = await callTextModel(stageConfig(config, maxTokens), system, prompt, { onTextDelta });
   return parseModelJson(raw, label);
 }
 
 async function callTextStage(stage, payload, config, maxTokens, onTextDelta) {
-  const { system, prompt } = buildPrompt(stage, payload);
+  const { system, prompt } = buildPrompt(stage, payload, config?.outputLocale);
   return callTextModel(stageConfig(config, maxTokens), system, prompt, { onTextDelta });
 }
 
@@ -287,11 +287,6 @@ async function handleApi(request, response, pathname) {
     return streamResult(response, (send) => generateStageResult(body, send));
   }
 
-  if (pathname === '/api/image') {
-    const result = await callImageModel(body.config ?? {}, String(body.prompt ?? '').slice(0, 8_000));
-    return sendJson(response, 200, result);
-  }
-
   return sendJson(response, 404, { error: '接口不存在。' });
 }
 
@@ -348,7 +343,7 @@ if (hasEnvProxy && supportsEnvProxy && !envProxyEnabled) {
   child.on('exit', (code) => { process.exitCode = code ?? 0; });
 } else {
   server.listen(port, host, () => {
-    console.log(`万象铸界已启动：http://${host}:${port}`);
+    console.log(`铸界已启动：http://${host}:${port}`);
     console.log(`工作目录：${appDir}`);
   });
 }

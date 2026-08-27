@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import { extractBook, sampleBookText } from '../lib/extractors.mjs';
-import { buildPrompt } from '../lib/prompts.mjs';
+import { buildPrompt, languageInstruction, OUTPUT_LANGUAGE_TERMS } from '../lib/prompts.mjs';
 import { callTextModel, providerPresets } from '../lib/providers.mjs';
 import { discoverModels, testModelConnection } from '../lib/model-routing.mjs';
 import { buildClaudeCliArgs, getClaudeCliModels } from '../lib/claude-cli.mjs';
@@ -10,7 +10,8 @@ import { normalizeSourceIdentification, researchIdentifiedSource, researchNamedW
 import { mergeCanonSections, normalizeCanonSection, normalizeDirectionResult, normalizeResearchDossier, normalizeTaskBrief, normalizeWorldCanon, parseModelJson, validateAuditResult, validateExpandedModule, validateNarrativeResearch, validateSummaryAlignment, validateTaskResearchPlan } from '../lib/workflow.mjs';
 import { api } from '../public/js/api.js';
 import { canonPartAsMarkdown, canonPartFromMarkdown, canonPreviewMarkdown } from '../public/js/canon-markdown.js';
-import { buildStandaloneWiki, exportData, getVisuals } from '../public/js/exporters.js';
+import { buildStandaloneWiki, exportData } from '../public/js/exporters.js';
+import { localizeText, localeTerm, SUPPORTED_LOCALES, t } from '../public/js/i18n.js';
 import { getAdvisoryAuditViolations, getAuditBurden, getAuditViolations, getBlockingAuditViolations, hasAuditPassed, renderMarkdown, validateWorldModule } from '../public/js/utils.js';
 import { canDeleteWorld } from '../public/js/world-store.js';
 
@@ -310,7 +311,7 @@ test('三个方向直接写正常世界介绍，不把内部设计语言推给�
   const prompt = buildPrompt('directions', { source: { brief: '海上浮岛' }, taskBrief: { mode: 'original' }, researchDossier: { summary: '潮汐支配交通' }, purpose: '世界之书', dials: {}, tone: '克制现实', focuses: [] }).prompt;
   assert.match(prompt, /普通读者直接阅读/);
   assert.match(prompt, /不生成实际世界观/);
-  assert.match(prompt, /overview 使用180至260个中文字符/);
+  assert.match(prompt, /overview 使用目标语言约一分钟的阅读量/);
   assert.match(prompt, /research_refs/);
   assert.match(prompt, /地域或地点.*角色、种族或族群.*关键事件/);
   assert.match(prompt, /选择之后也只能在原著不足处扩展/);
@@ -689,8 +690,7 @@ test('正典是扩写、审计、修补与简版的共同事实来源', () => {
 test('扩写写可读世界事实，禁止方法语言和空栏目', () => {
   const prompt = buildPrompt('expand', { batch: 'L3', worldCanon: { axioms: [] }, researchDossier: {}, previous: '' }).prompt;
   assert.match(prompt, /普通人的工作日/);
-  assert.match(prompt, /只输出可直接收入世界之书的中文 Markdown/);
-  assert.match(prompt, /只输出可直接收入世界之书的中文 Markdown/);
+  assert.match(prompt, /只输出可直接收入世界之书的目标语言 Markdown/);
   assert.match(prompt, /不要输出代码围栏/);
   assert.match(prompt, /## 原著承接/);
 });
@@ -747,9 +747,12 @@ test('新审计结构会合并正典与正文问题', () => {
   assert.equal(hasAuditPassed({ canon_violations: [], prose_violations: [] }), true);
 });
 
-test('Markdown 表格和分隔线可以渲染为 Wiki 结构', () => {
-  const html = renderMarkdown('# 标题\n\n| 名称 | 作用 |\n| --- | --- |\n| 潮港 | 供水 |\n\n---');
-  assert.match(html, /<table>/);
+test('Markdown 表格、图片和图示会转成纯文字内容', () => {
+  const html = renderMarkdown('# 标题\n\n| 名称 | 作用 |\n| --- | --- |\n| 潮港 | 供水 |\n\n![地图](https://example.com/map.png)\n\n```mermaid\ngraph TD; A-->B\n```\n\n---');
+  assert.doesNotMatch(html, /<(?:table|img|svg|figure)\b/i);
+  assert.match(html, /名称.*潮港/);
+  assert.match(html, /地图/);
+  assert.doesNotMatch(html, /graph TD/);
   assert.match(html, /<hr>/);
 });
 
@@ -947,18 +950,19 @@ test('API Key 会去掉 Bearer 前缀并拒绝中文', async () => {
   } finally { globalThis.fetch = originalFetch; }
 });
 
-test('世界之书导出包含研究来源、三张离线图和世界正典', () => {
+test('世界之书导出包含研究来源和世界正典且只保留文字', () => {
   const seed = { name: '潮环', one_line: '浮岛随潮迁徙', model_type: '潮汐文明', historical_depth: '千年', scale: '星球', construction_mode: 'create', world_anchors: { places: ['潮港'], peoples: ['拾潮人'], institutions: ['水议会'], flora_fauna_goods_customs: ['盐舟'] } };
   const world = '# 一眼看懂这个世界\n浮岛随潮迁徙。\n\n# 地方与彼此关系\n潮港供水。\n\n# 人们怎样生活\n居民逐潮工作。';
   const data = { seed, world, summary: '简版', art: [], researchDossier: { references: [{ title: '资料', url: 'https://example.com/source', provider: '资料库', kind: '概述' }] }, worldCanon: { identity: { name: '潮环' } } };
   const html = buildStandaloneWiki(data);
   assert.match(html, /本次生成使用的公开资料/);
-  assert.ok((html.match(/data:image\/svg\+xml;base64/g) || []).length >= 3);
+  assert.doesNotMatch(html, /<(?:img|svg|figure|table)\b/i);
+  assert.doesNotMatch(html, /data:image|image_prompts/);
   const exported = exportData({ ...data, source: { mode: 'brief', brief: '海上浮岛', ipTier: '自动判断' }, purpose: '世界之书', selectedSeed: seed, modules: {}, audit: null, taskBrief: { mode: 'original' } });
   assert.equal(exported.schema_version, 'world-axiom-studio/0.3');
   assert.equal(exported.world_canon.identity.name, '潮环');
   assert.equal(exported.research_dossier.references.length, 1);
-  assert.equal(getVisuals(seed).length, 3);
+  assert.equal('image_prompts' in exported, false);
 });
 
 test('已有作品导出向读者展示主次世界、时空接入和原著承接', () => {
@@ -983,6 +987,11 @@ test('已有作品导出向读者展示主次世界、时空接入和原著承�
 
 test('页面流程是依据、研究、方向、世界、发布，列表保持上一级', () => {
   const html = source('public/index.html');
+  assert.match(html, /<title>铸界 · 世界观生成工作台<\/title>/);
+  assert.ok((html.match(/铸造只属于你的/g) || []).length >= 2);
+  assert.doesNotMatch(html, /万象铸界|WORLD AXIOM STUDIO/);
+  assert.doesNotMatch(html, /所有世界/);
+  assert.ok((html.match(/\/assets\/logo-mark\.svg/g) || []).length >= 3);
   assert.match(html, /data-step="input"[\s\S]*data-step="research"[\s\S]*data-step="cards"[\s\S]*data-step="forge"[\s\S]*data-step="export"/);
   assert.doesNotMatch(html, /data-step="library"/);
   assert.match(html, /data-screen="library"/);
@@ -1114,4 +1123,40 @@ test('世界只有归档后才能永久删除', () => {
   assert.equal(canDeleteWorld({ status: 'archived' }), true);
   const store = source('public/js/world-store.js');
   assert.match(store, /必须先归档/);
+});
+
+test('四种语言共享稳定术语表，未知专名不会被机械改写', () => {
+  assert.deepEqual(SUPPORTED_LOCALES, ['zh-CN', 'zh-TW', 'en', 'ja']);
+  assert.equal(localeTerm('product', 'zh-TW'), '鑄界');
+  assert.equal(localeTerm('product', 'en'), 'Zhujie');
+  assert.equal(localeTerm('product', 'ja'), '鋳界');
+  assert.equal(t('世界之书', 'en'), 'World Book');
+  assert.equal(t('世界正典', 'ja'), 'ワールド・カノン');
+  assert.equal(localizeText('青丘云港', 'en'), '青丘云港');
+  assert.equal(localizeText('12 个结果', 'ja'), '12件');
+});
+
+test('各语言提示词要求通行译名并保持跨阶段专名一致', () => {
+  assert.equal(OUTPUT_LANGUAGE_TERMS.en.worldBook, 'World Book');
+  assert.match(languageInstruction('en'), /natural English/);
+  assert.match(languageInstruction('en'), /通行译名/);
+  assert.match(languageInstruction('ja'), /ワールド・カノン/);
+  assert.match(languageInstruction('zh-TW'), /繁體中文/);
+  const english = buildPrompt('summary', { worldCanon: {}, world: '' }, 'en');
+  assert.match(english.system, /Zhujie/);
+  assert.match(english.system, /不得逐字硬译或自造译名/);
+  assert.match(english.prompt, /目标语言三分钟阅读量/);
+});
+
+test('语言选择同时驱动界面、模型输出和导出，不改变页面地址', () => {
+  const html = source('public/index.html');
+  const app = source('public/js/app.js');
+  const server = source('server.mjs');
+  const exporters = source('public/js/exporters.js');
+  assert.match(html, /id="languageSelect"/);
+  for (const locale of SUPPORTED_LOCALES) assert.match(html, new RegExp(`value="${locale}"`));
+  assert.match(app, /outputLocale: getLocale\(\)/);
+  assert.match(server, /buildPrompt\(stage, payload, config\?\.outputLocale\)/);
+  assert.match(exporters, /<html lang="\$\{getLocale\(\)\}"/);
+  assert.doesNotMatch(source('public/js/i18n.js'), /location\.(?:href|assign)|history\./);
 });

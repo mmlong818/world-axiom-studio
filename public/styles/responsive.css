@@ -108,8 +108,6 @@
   .source-layer-band b { display: none; }
   .source-references ul { grid-template-columns: 1fr; }
   .wiki-cover { padding: 28px 22px; }
-  .art-direction { align-items: stretch; flex-direction: column; }
-  .art-direction button { width: 100%; }
   .settings-card header, .settings-card footer { padding: 16px; }
   .world-detail-card > header, .world-detail-card > footer { padding: 16px; }
   .world-detail-body { padding: 18px 16px; }
@@ -149,6 +147,7 @@
   .library-stat:last-child { border-bottom: 0; }
   .topbar { height: 52px; }
   .mode-badge { display: none; }
+  .language-picker select { min-width: 88px; max-width: 96px; padding-left: 8px; }
   .workspace-crumb { gap: 5px; }
   .back-to-library { padding-inline: 5px; }
   .crumb-divider { display: none; }
@@ -168,7 +167,7 @@
 
 @media print {
   body { background: white; }
-  .rail, .topbar, .section-header, .export-tabs, .art-direction, .download-grid { display: none !important; }
+  .rail, .topbar, .section-header, .export-tabs, .download-grid { display: none !important; }
   .app-shell, .main-column { display: block; border: 0; }
   .screen { max-width: none; padding: 0; }
   .screen:not(#screen-export) { display: none !important; }

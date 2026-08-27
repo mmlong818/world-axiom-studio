@@ -1,8 +1,11 @@
 import { api } from './api.js?v=6';
 import { canonPartAsMarkdown, canonPartFromMarkdown, canonPreviewMarkdown } from './canon-markdown.js';
-import { buildImagePrompts, buildSimplePreview, buildWikiPreview, downloadDeliverable } from './exporters.js?v=18';
-import { cleanModelMarkdown, escapeHtml, fileToBase64, getAdvisoryAuditViolations, getAuditBurden, getAuditViolations, getBlockingAuditViolations, hasAuditPassed, parseModelJson, renderMarkdown, validateWorldModule } from './utils.js?v=8';
+import { buildSimplePreview, buildWikiPreview, downloadDeliverable } from './exporters.js?v=19';
+import { getLocale, initI18n } from './i18n.js?v=6';
+import { cleanModelMarkdown, escapeHtml, fileToBase64, getAdvisoryAuditViolations, getAuditBurden, getAuditViolations, getBlockingAuditViolations, hasAuditPassed, parseModelJson, renderMarkdown, validateWorldModule } from './utils.js?v=9';
 import { addWorldTask, archiveWorld, createBlankWorld, deleteArchivedWorld, getWorld, initializeWorldStore, listWorlds, putWorld, restoreWorld } from './world-store.js?v=9';
+
+initI18n();
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -14,7 +17,7 @@ const state = {
   purpose: '世界之书', skin: '自动判断', buildIntent: 'auto', dials: {}, tone: '自动判断', focuses: [],
   providers: [], config: {}, credentialProvider: '', modelRoute: null, availableModels: [], modelSetupBusy: false, manualModelMode: false, taskBrief: null, researchDossier: null, directionComparison: '', cards: [], selectedSeed: null, worldCanon: null,
   canonParts: {}, modules: {}, forgeApprovals: {}, forgeDrafts: {}, activeForgeBatch: null, forgeBusy: false, directionContinuityUpgradeRequired: false, sourceContinuityUpgradeRequired: false,
-  world: '', audit: null, summary: '', art: [], exportTab: 'wiki',
+  world: '', audit: null, summary: '', exportTab: 'wiki',
   currentWorldId: '', activeLibraryWorldId: '', libraryWorlds: [],
 };
 
@@ -296,14 +299,13 @@ function loadModelSettings() {
 function saveModelSettings() {
   const { apiKey: _apiKey, ...safeRoute } = state.modelRoute || {};
   const settings = {
+    ...loadModelSettings(),
     provider: $('#providerSelect').value,
     baseUrl: $('#baseUrlInput').value.trim(),
     model: selectedModelId(),
     temperature: Number($('#temperatureInput').value),
     protocol: $('#protocolSelect').value,
     route: state.modelRoute ? safeRoute : null,
-    imageBaseUrl: $('#imageBaseUrlInput').value.trim(),
-    imageModel: $('#imageModelInput').value.trim(),
   };
   window.localStorage.setItem(MODEL_SETTINGS_KEY, JSON.stringify(settings));
 }
@@ -318,24 +320,20 @@ function loadModelCredentials() {
 function saveVisibleCredentials(provider = $('#providerSelect').value) {
   const saved = loadModelCredentials();
   const apiKey = normalizeApiKey($('#apiKeyInput').value);
-  const imageApiKey = normalizeApiKey($('#imageApiKeyInput').value);
   if (apiKey) saved.textByProvider[provider] = apiKey;
   else delete saved.textByProvider[provider];
-  saved.imageApiKey = imageApiKey;
   window.localStorage.setItem(MODEL_CREDENTIALS_KEY, JSON.stringify(saved));
 }
 
 function restoreVisibleCredentials(provider = $('#providerSelect').value) {
   const saved = loadModelCredentials();
   $('#apiKeyInput').value = saved.textByProvider[provider] || '';
-  $('#imageApiKeyInput').value = saved.imageApiKey || '';
   state.credentialProvider = provider;
 }
 
 function clearSavedCredentials() {
   window.localStorage.removeItem(MODEL_CREDENTIALS_KEY);
   $('#apiKeyInput').value = '';
-  $('#imageApiKeyInput').value = '';
   invalidateModelSetup('密钥已清除，请重新连接。');
   showToast('本机保存的模型密钥已清除。');
 }
@@ -438,7 +436,7 @@ function applyBlueprint(record) {
   const blueprint = record.blueprint || {};
   state.taskBrief = null; state.researchDossier = null; state.directionComparison = ''; state.cards = []; state.selectedSeed = null; state.worldCanon = null; state.canonParts = {}; state.modules = {};
   state.forgeApprovals = {}; state.forgeDrafts = {}; state.activeForgeBatch = null; state.forgeBusy = false; state.directionContinuityUpgradeRequired = false; state.sourceContinuityUpgradeRequired = false;
-  state.world = ''; state.audit = null; state.summary = ''; state.art = []; state.exportTab = 'wiki';
+  state.world = ''; state.audit = null; state.summary = ''; state.exportTab = 'wiki';
   ['research', 'cards', 'forge', 'audit', 'export'].forEach((step) => setStepEnabled(step, false));
   state.currentWorldId = record.id;
   state.buildIntent = blueprint.buildIntent || 'auto';
@@ -545,11 +543,11 @@ function restoreSnapshot(record) {
 
 async function renderLibrary() {
   state.libraryWorlds = await listWorlds();
-  const query = $('#worldSearch').value.trim().toLocaleLowerCase('zh-CN');
+  const query = $('#worldSearch').value.trim().toLocaleLowerCase(getLocale());
   const family = $('#familyFilter').value || 'all';
   const kind = $('#worldKindFilter').value || 'active';
   const filtered = state.libraryWorlds.filter((world) => {
-    const haystack = [world.title, world.oneLine, world.sourceReference, ...(world.tags || []), ...(world.tasks || []).map((task) => task.title)].join(' ').toLocaleLowerCase('zh-CN');
+    const haystack = [world.title, world.oneLine, world.sourceReference, ...(world.tags || []), ...(world.tasks || []).map((task) => task.title)].join(' ').toLocaleLowerCase(getLocale());
     const matchesStatus = kind === 'all' || (kind === 'archived' ? world.status === 'archived' : world.status !== 'archived');
     return (!query || haystack.includes(query))
       && (family === 'all' || world.family === family)
@@ -579,7 +577,7 @@ async function openWorldDetail(worldId) {
   state.activeLibraryWorldId = world.id;
   const archived = world.status === 'archived';
   const statusLabels = { draft: '草稿', 'in-progress': '生成中', ready: '可交付', archived: '已归档' };
-  const updated = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(world.updatedAt || world.createdAt));
+  const updated = new Intl.DateTimeFormat(getLocale(), { year: 'numeric', month: 'short', day: 'numeric' }).format(new Date(world.updatedAt || world.createdAt));
   $('#worldDetailEyebrow').textContent = archived ? 'ARCHIVED WORLD' : 'YOUR WORLD';
   $('#worldDetailTitle').textContent = world.title;
   $('#worldDetailBody').innerHTML = `<p class="world-detail-lead">${escapeHtml(world.oneLine)}</p>
@@ -648,7 +646,7 @@ function resetDownstream(from = 'cards') {
     state.forgeApprovals = {}; state.forgeDrafts = {}; state.activeForgeBatch = null; state.forgeBusy = false;
   }
   if (index <= screens.indexOf('audit')) state.audit = null;
-  if (index <= screens.indexOf('export')) { state.summary = ''; state.art = []; }
+  if (index <= screens.indexOf('export')) state.summary = '';
   screens.slice(index).forEach((step) => setStepEnabled(step, false));
   if (index <= screens.indexOf('forge')) {
     $('#forgeTitle').textContent = '世界正在被解释清楚';
@@ -865,18 +863,10 @@ function modelConfig() {
     model: selectedModelId(),
     apiKey: normalizeApiKey($('#apiKeyInput').value),
     temperature: Number($('#temperatureInput').value),
+    outputLocale: getLocale(),
   };
-  if (modelRouteMatches(state.modelRoute, current)) return { ...current, ...state.modelRoute, apiKey: current.apiKey, temperature: current.temperature };
+  if (modelRouteMatches(state.modelRoute, current)) return { ...current, ...state.modelRoute, apiKey: current.apiKey, temperature: current.temperature, outputLocale: current.outputLocale };
   return current;
-}
-
-function imageConfig() {
-  return {
-    provider: 'openai', protocol: 'openai',
-    baseUrl: $('#imageBaseUrlInput').value.trim(),
-    model: $('#imageModelInput').value.trim(),
-    apiKey: normalizeApiKey($('#imageApiKeyInput').value || $('#apiKeyInput').value),
-  };
 }
 
 function validateLiveConfig(config) {
@@ -1541,7 +1531,7 @@ function invalidateForgeAfter(batch) {
     if (FORGE_BATCHES.includes(downstream)) delete state.modules[downstream];
   }
   if (CANON_STEPS.includes(batch)) state.worldCanon = null;
-  state.audit = null; state.summary = ''; state.art = [];
+  state.audit = null; state.summary = '';
   setStepEnabled('audit', false); setStepEnabled('export', false);
   rebuildApprovedWorld();
 }
@@ -1870,7 +1860,7 @@ async function finalizeWorld({ useModel = true, notice = '' } = {}) {
   finally { hideLoading(); }
 }
 
-function exportPayload() { return { seed: state.selectedSeed, world: state.world, audit: state.audit, summary: state.summary, art: state.art, taskBrief: state.taskBrief, researchDossier: state.researchDossier, worldCanon: state.worldCanon }; }
+function exportPayload() { return { seed: state.selectedSeed, world: state.world, audit: state.audit, summary: state.summary, taskBrief: state.taskBrief, researchDossier: state.researchDossier, worldCanon: state.worldCanon }; }
 
 function renderExport() {
   $('#exportPreview').innerHTML = state.exportTab === 'wiki' ? buildWikiPreview(exportPayload()) : buildSimplePreview(exportPayload());
@@ -1878,28 +1868,6 @@ function renderExport() {
     const active = tab.dataset.exportTab === state.exportTab;
     tab.classList.toggle('is-active', active); tab.setAttribute('aria-selected', String(active));
   });
-}
-
-async function generateArt() {
-  const config = imageConfig();
-  if (!config.apiKey) {
-    $('#settingsDialog').showModal();
-    showToast('请在“图片模型”中填写接口与密钥。');
-    return;
-  }
-  try {
-    state.art = [];
-    const prompts = buildImagePrompts(state.selectedSeed);
-    showLoading('正在生成世界配图', '第 1 / 3 张 · 世界封面', 16);
-    for (let index = 0; index < prompts.length; index += 1) {
-      updateLoading('正在生成世界配图', `第 ${index + 1} / 3 张 · ${['世界封面','关键地点','普通人生活'][index]}`, 20 + index * 30);
-      const image = await api.generateImage(prompts[index], config);
-      state.art.push(image);
-      if (image.warning) showToast(image.warning, 8_000);
-    }
-    renderExport(); showToast('3 张配图已替换进 Wiki。');
-  } catch (error) { showToast(error.message, 6_000); }
-  finally { hideLoading(); }
 }
 
 async function handleBook(file) {
@@ -2027,7 +1995,6 @@ function bindEvents() {
   $('#skipRepair').addEventListener('click', () => acceptAuditAndFinalize());
   $$('.export-tab').forEach((tab) => tab.addEventListener('click', () => { state.exportTab = tab.dataset.exportTab; renderExport(); }));
   $$('.download-card').forEach((button) => button.addEventListener('click', () => downloadDeliverable(button.dataset.download, state)));
-  $('#generateArt').addEventListener('click', generateArt);
   $$('.step-link').forEach((button) => button.addEventListener('click', () => { if (!button.disabled) navigate(button.dataset.step); }));
   const dialog = $('#settingsDialog');
   ['#openSettings','#openSettingsMobile'].forEach((selector) => $(selector).addEventListener('click', () => dialog.showModal()));
@@ -2092,8 +2059,6 @@ async function init() {
       $('#temperatureInput').value = String(savedSettings.temperature);
       $('#temperatureOutput').value = String(savedSettings.temperature);
     }
-    if (savedSettings.imageBaseUrl) $('#imageBaseUrlInput').value = savedSettings.imageBaseUrl;
-    if (savedSettings.imageModel) $('#imageModelInput').value = savedSettings.imageModel;
     restoreVisibleCredentials(savedProvider);
     state.modelRoute = savedSettings.route?.verifiedAt ? savedSettings.route : null;
     if (modelRouteMatches(state.modelRoute, modelConfig())) {

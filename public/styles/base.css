@@ -117,6 +117,7 @@ h3 { font-size: var(--text-xl); line-height: 1.25; letter-spacing: -0.01em; }
 
 .screen-heading { max-width: 780px; margin-bottom: var(--space-7); }
 .screen-heading > p:last-child, .section-header p { max-width: 62ch; color: var(--ink-soft); }
+.site-credit { max-width: 1120px; margin: -56px auto 0; padding: 0 clamp(28px, 5vw, 80px) 28px; color: var(--ink-subtle); font-size: .72rem; letter-spacing: .035em; text-align: center; }
 
 .prose { color: var(--ink); }
 .prose h1, .prose h2, .prose h3 { font-family: var(--font-display); }
@@ -128,10 +129,6 @@ h3 { font-size: var(--text-xl); line-height: 1.25; letter-spacing: -0.01em; }
 .prose strong { font-weight: 650; }
 .prose blockquote { margin: 24px 0; padding: 16px 20px; border-left: 3px solid var(--accent); background: var(--accent-soft); }
 .prose code { padding: 2px 5px; border-radius: 4px; background: var(--surface-muted); font-size: 0.9em; }
-.prose table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 0.9rem; }
-.prose th, .prose td { padding: 10px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
-.prose th { background: var(--surface-muted); }
-
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
