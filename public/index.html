@@ -7,9 +7,9 @@
   <meta name="theme-color" content="#f2eee5">
   <meta name="description" content="从一句世界命题或一组材料中创造或还原完整世界模型。">
   <title>万象铸界 · 世界观生成工作台</title>
-  <link rel="stylesheet" href="/styles/base.css?v=8">
-  <link rel="stylesheet" href="/styles/components.css?v=13">
-  <link rel="stylesheet" href="/styles/responsive.css?v=8">
+  <link rel="stylesheet" href="/styles/base.css?v=9">
+  <link rel="stylesheet" href="/styles/components.css?v=29">
+  <link rel="stylesheet" href="/styles/responsive.css?v=13">
 </head>
 <body>
   <a class="skip-link" href="#main-content">跳到主要内容</a>
@@ -49,24 +49,24 @@
 
       <nav class="step-nav" id="stepNav">
         <button class="step-link" type="button" data-step="input">
-          <span class="step-index">01</span><svg><use href="#i-book"/></svg><span>提供依据</span>
+          <span class="step-index">01</span><svg><use href="#i-book"/></svg><span>依据</span>
+        </button>
+        <button class="step-link" type="button" data-step="research" disabled>
+          <span class="step-index">02</span><svg><use href="#i-search"/></svg><span>研究</span>
         </button>
         <button class="step-link" type="button" data-step="cards" disabled>
-          <span class="step-index">02</span><svg><use href="#i-seed"/></svg><span>选择模型</span>
+          <span class="step-index">03</span><svg><use href="#i-seed"/></svg><span>方向</span>
         </button>
         <button class="step-link" type="button" data-step="forge" disabled>
-          <span class="step-index">03</span><svg><use href="#i-layers"/></svg><span>构建世界</span>
-        </button>
-        <button class="step-link" type="button" data-step="audit" disabled>
-          <span class="step-index">04</span><svg><use href="#i-shield"/></svg><span>一致性审计</span>
+          <span class="step-index">04</span><svg><use href="#i-layers"/></svg><span>世界</span>
         </button>
         <button class="step-link" type="button" data-step="export" disabled>
-          <span class="step-index">05</span><svg><use href="#i-export"/></svg><span>发布世界之书</span>
+          <span class="step-index">05</span><svg><use href="#i-export"/></svg><span>发布</span>
         </button>
       </nav>
 
       <div class="rail-foot">
-        <div class="privacy-note"><svg><use href="#i-lock"/></svg><span>内容只在本机处理<br>密钥不落盘</span></div>
+        <div class="privacy-note"><svg><use href="#i-lock"/></svg><span>世界保存在本机<br>密钥只存当前浏览器</span></div>
         <button class="quiet-button" id="openSettings" type="button"><svg><use href="#i-settings"/></svg><span>模型与接口</span></button>
       </div>
     </aside>
@@ -120,9 +120,9 @@
           </div>
 
           <div class="source-panel is-active" id="panel-brief" role="tabpanel" aria-labelledby="tab-brief">
-            <label class="field-label" for="briefInput">描述世界，或写下你已经知道的事实</label>
-            <textarea id="briefInput" rows="7" maxlength="8000" placeholder="例如：这是一个被永久云层覆盖的海洋星球。聚落依附浮岛生存，能源来自潮汐，已知文明至少经历过两次迁徙。"></textarea>
-            <div class="field-foot"><span>可以写自然规律、地理、历史、族群，也可以只有一句核心命题。</span><span id="briefCount">0 / 8000</span></div>
+            <label class="field-label" for="briefInput">描述世界，或输入一本书、影视、游戏等已有作品的名称</label>
+            <textarea id="briefInput" rows="7" maxlength="8000" placeholder="例如：这是一个被永久云层覆盖的海洋星球；也可以输入《镜花缘》，或说明希望把两部作品的世界构造方式进行原创融合。"></textarea>
+            <div class="field-foot"><span>单部作品会先还原再补足；多部作品会确定主世界、次世界和时空接入点，保留原著名称与事件连续性。</span><span id="briefCount">0 / 8000</span></div>
           </div>
 
           <div class="source-panel" id="panel-book" role="tabpanel" aria-labelledby="tab-book" hidden>
@@ -131,7 +131,7 @@
               <span class="dropzone-icon"><svg><use href="#i-upload"/></svg></span>
               <strong>拖入或选择一本书</strong>
               <span>PDF、EPUB、DOCX、TXT、Markdown · 最大 25 MB</span>
-              <small>只分析世界事实、结构与成书方式；在版作品不会被续写或换名照搬。</small>
+              <small>先复现故事经历、人物、地方、风物与事件；资料不足处才会明确标注并扩展，不复制原文表达。</small>
             </label>
             <div class="file-card" id="fileCard" hidden>
               <svg><use href="#i-book"/></svg>
@@ -142,28 +142,28 @@
             <textarea id="bookIntent" rows="3" maxlength="1000" placeholder="例如：优先还原地理、历史、族群与制度。证据不足的部分标记未知，不要补写。"></textarea>
           </div>
 
-          <div class="meta-grid">
-            <label><span>构建方式</span><select id="buildIntentSelect"><option value="auto">自动判断</option><option value="create">创造新世界</option><option value="reconstruct">还原已有世界</option></select></label>
+          <div class="meta-grid is-essential">
+            <label hidden><span>构建方式</span><select id="buildIntentSelect"><option value="auto">自动判断</option><option value="create">创造新世界</option><option value="reconstruct">还原已有世界</option></select></label>
             <label><span>使用目的</span><select id="purposeSelect"><option>世界之书</option><option>小说</option><option>游戏</option><option>影视</option><option>TRPG</option><option>研究整理</option></select></label>
-            <label><span>题材皮肤</span><select id="skinSelect"><option>自动判断</option><option>奇幻</option><option>科幻</option><option>近未来</option><option>古装</option><option>现代</option><option>行业剧</option><option>魔幻现实</option></select></label>
-            <label><span>原作授权</span><select id="ipTierSelect"><option>自动判断</option><option>公有领域</option><option>开放许可</option><option>在版专有</option></select></label>
+            <label><span>世界范围</span><select id="dialScale"><option>交给系统</option><option>单一场所</option><option>聚落或街区</option><option>城市与周边</option><option>区域或国家</option><option>大陆或整颗星球</option><option>多星球或多位面</option></select><small class="field-hint">指需要解释清楚的范围，不是故事镜头。</small></label>
+            <label><span>文字气质</span><select id="toneSelect"><option>自动判断</option><option>明亮而有代价</option><option>克制现实</option><option>神秘幽微</option><option>黑暗沉重</option><option>荒诞讽刺</option><option>史诗庄严</option></select></label>
+            <label hidden><span>题材皮肤</span><select id="skinSelect"><option>自动判断</option><option>奇幻</option><option>科幻</option><option>近未来</option><option>古装</option><option>现代</option><option>行业剧</option><option>魔幻现实</option></select></label>
+            <label hidden><span>原作授权</span><select id="ipTierSelect"><option>自动判断</option><option>公有领域</option><option>开放许可</option><option>在版专有</option></select></label>
           </div>
 
-          <details class="advanced-panel" id="advancedPanel">
+          <details class="advanced-panel" id="advancedPanel" hidden>
             <summary><span><svg><use href="#i-sliders"/></svg>调整世界模型的五项边界</span><small>可跳过，由系统判断</small></summary>
             <div class="dial-grid">
               <label><span>关键约束是什么</span><select id="dialScarcity"><option>交给系统</option><option>能量与物资</option><option>时间与寿命</option><option>信息与真相</option><option>情感与联结</option><option>身份与名额</option><option>意义本身</option><option>不以稀缺为核心</option></select></label>
               <label><span>异常是否属于自然规律</span><select id="dialAbnormality"><option>交给系统</option><option>完全系统化</option><option>部分成体系</option><option>存在但尚不可解释</option><option>发生却被否认</option><option>没有异常</option></select></label>
               <label><span>文明正处在哪一段</span><select id="dialPhase"><option>交给系统</option><option>上升期</option><option>鼎盛的表面之下</option><option>缓慢腐朽</option><option>崩塌之后</option><option>循环重启中</option></select></label>
               <label><span>基本规则能否被改变</span><select id="dialStance"><option>交给系统</option><option>完全不可改变</option><option>只能局部适应</option><option>可由集体缓慢改写</option><option>可被制度协商</option><option>持续自发变化</option></select></label>
-              <label class="scale-field"><span>世界覆盖范围</span><select id="dialScale"><option>交给系统</option><option>单一场所</option><option>聚落或街区</option><option>城市与周边</option><option>区域或国家</option><option>大陆或整颗星球</option><option>多星球或多位面</option></select><small class="field-hint">这是世界模型需要解释到的范围，不是故事镜头大小。</small></label>
             </div>
           </details>
 
-          <details class="creative-direction-panel">
+          <details class="creative-direction-panel" hidden>
             <summary><span>呈现取向</span><small>可跳过，只调整表达重心</small></summary>
             <div class="creative-direction-body">
-              <label class="tone-field" for="toneSelect"><span>整体气质</span><select id="toneSelect"><option>自动判断</option><option>明亮而有代价</option><option>克制现实</option><option>神秘幽微</option><option>黑暗沉重</option><option>荒诞讽刺</option><option>史诗庄严</option></select><small>不选时，模型会从你的说明或书籍中判断。</small></label>
               <fieldset class="focus-fieldset">
                 <legend>表达重点 <small>可多选，也可以不选</small></legend>
                 <p>这些选项只是提示关注方向，不要求逐项覆盖，也不改变世界规则。</p>
@@ -182,14 +182,57 @@
           <div class="generation-status" id="generationStatus" role="status" hidden></div>
           <div class="primary-action-row">
             <button class="text-button" id="loadExample" type="button">填入一个示例</button>
-            <button class="primary-button" id="generateSeeds" type="button"><span>生成 3 个世界模型</span><svg><use href="#i-arrow"/></svg></button>
+            <button class="primary-button" id="generateSeeds" type="button"><span>研究并生成 3 个世界方向</span><svg><use href="#i-arrow"/></svg></button>
           </div>
+        </div>
+      </section>
+
+      <section class="screen" id="screen-research" data-screen="research" hidden>
+        <div class="section-header compact-header research-header">
+          <div><p class="eyebrow">研究 · 回到故事发生的地方</p><h2>先看材料讲了什么，<br>再决定怎样创造。</h2><p>这里先整理故事经历、人物与群体、地方风物、民风日常和关键事件。规则只在后续用于解释世界，不能代替故事本身。</p></div>
+          <div class="research-header-actions">
+            <button class="secondary-button" id="rerunResearch" type="button">重新研究</button>
+            <button class="primary-button" id="generateFromResearch" type="button">根据这份研究生成 3 个方向</button>
+          </div>
+        </div>
+        <div class="research-direction-status" id="researchDirectionStatus" role="status" aria-live="polite" hidden></div>
+        <div class="research-workspace">
+          <section class="research-brief-card" id="taskBriefPanel" aria-label="任务简报"></section>
+          <section class="research-summary-card">
+            <div class="research-card-heading"><span>故事概况</span><strong>故事怎样带读者进入世界</strong></div>
+            <p id="researchSummary"></p>
+            <div class="research-impressions" id="researchImpressions"></div>
+          </section>
+          <section class="research-questions-card">
+            <div class="research-card-heading"><span>问题与回答</span><strong>这次研究实际解决了什么</strong></div>
+            <div class="research-question-list" id="researchQuestionAnswers"></div>
+          </section>
+          <section class="research-plot-card">
+            <div class="research-card-heading"><span>原作情节总线</span><strong>从开端到结局发生了什么</strong></div>
+            <div class="research-plot-list" id="researchPlotArcs"></div>
+          </section>
+          <section class="research-column">
+            <div class="research-card-heading"><span>故事中的世界</span><strong>人物、地方与风物</strong></div>
+            <div class="research-finding-list" id="researchFindings"></div>
+          </section>
+          <section class="research-column">
+            <div class="research-card-heading"><span>关键事件</span><strong>哪些事情改变了人物与世界</strong></div>
+            <div class="research-mechanism-list" id="researchMechanisms"></div>
+          </section>
+          <section class="research-sources-card">
+            <div class="research-card-heading"><span>资料来源</span><strong>本次实际读取的材料</strong></div>
+            <div class="research-reference-list" id="researchReferences"></div>
+          </section>
+          <section class="research-gaps-card">
+            <div class="research-card-heading"><span>边界与缺口</span><strong>不应被伪装成事实的内容</strong></div>
+            <ul id="researchGaps"></ul>
+          </section>
         </div>
       </section>
 
       <section class="screen" id="screen-cards" data-screen="cards" hidden>
         <div class="section-header compact-header">
-          <div><p class="eyebrow">候选 · 三种世界观概述</p><h2>先选世界方向，再展开完整世界</h2><p>每张卡用具体地点、居民、生活和风物介绍一种世界方向。选中后，下一步才会生成完整的世界之书。</p></div>
+          <div><p class="eyebrow">候选 · 三种呈现方向</p><h2>先决定怎样介绍，<br>再开始建立世界。</h2><p>每个方向只有约 200 字，说明准备从什么视角和哪些材料进入这个世界。地域、族群、民风、历史与制度会在选定方向后逐步构建。</p></div>
           <button class="secondary-button" id="regenerateCards" type="button">重新建模</button>
         </div>
         <div class="triage-strip" id="triageStrip"></div>
@@ -198,7 +241,7 @@
 
       <section class="screen" id="screen-forge" data-screen="forge" hidden>
         <div class="section-header compact-header">
-          <div><p class="eyebrow">编纂 · 世界之书</p><h2 id="forgeTitle">世界正在被解释清楚</h2><p>先建立整体认识，再说明世界如何运转、地方怎样联系、历史为何形成今天，以及人们怎样生活。</p></div>
+          <div><p class="eyebrow">分步构建 · 每一步由你确认</p><h2 id="forgeTitle">世界正在被解释清楚</h2><p>世界基础拆成定位、规律与地方、历史与社会、日常与条目 4 步；每次只生成一部分。你可以阅读、修改或重做，确认后的版本才会进入下一步。</p></div>
           <button class="secondary-button" id="resumeForge" type="button" hidden>从中断处继续</button>
         </div>
         <div class="forge-layout">
@@ -207,8 +250,44 @@
             <section class="forge-activity" id="forgeActivity" aria-label="当前构建节点" hidden>
               <div class="forge-activity-head"><span id="forgeNodeCode">节点 01 / 05</span><time id="forgeNodeElapsed">已等待 0 秒</time></div>
               <div class="forge-activity-message" aria-live="polite" aria-atomic="true"><strong id="forgeNodeTitle">正在建立整体认识与运转方式</strong><p id="forgeNodeDetail">确定这个世界最先需要理解的事实，以及它如何影响普通人的生活。</p></div>
-              <div class="forge-activity-foot"><span id="forgeNodeCompleted">已完成 0 / 5</span><span id="forgeNodeNext">下一节点：地方与历史</span></div>
+              <section class="forge-stream" id="forgeStream" aria-label="模型实时输出" hidden>
+                <header><span>实时草稿</span><small id="forgeStreamCount">等待模型返回文字</small></header>
+                <pre id="forgeStreamText" aria-live="polite"></pre>
+              </section>
+              <div class="forge-activity-foot"><span id="forgeNodeCompleted">已完成 0 / 6</span><span id="forgeNodeNext">下一节点：世界概览</span></div>
             </section>
+            <section class="forge-review" id="forgeReviewPanel" aria-labelledby="forgeReviewTitle" hidden>
+              <header class="forge-review-head">
+                <div><span id="forgeReviewStatus">待审核</span><h3 id="forgeReviewTitle">审核当前步骤</h3><p id="forgeReviewDescription">确认后才会生成下一步。</p></div>
+                <small id="forgeReviewPosition">步骤 01 / 05</small>
+              </header>
+              <div class="forge-view-switch" role="tablist" aria-label="审核视图">
+                <button class="forge-view-tab is-active" id="forgePreviewViewTab" type="button" role="tab" aria-selected="true" aria-controls="forgePreviewPane" data-forge-view="preview">阅读预览</button>
+                <button class="forge-view-tab" id="forgeEditViewTab" type="button" role="tab" aria-selected="false" aria-controls="forgeEditorPane" data-forge-view="edit">修改 Markdown</button>
+              </div>
+              <div class="forge-review-workspace">
+                <div class="forge-editor-field forge-review-pane" id="forgeEditorPane" role="tabpanel" aria-labelledby="forgeEditViewTab" hidden>
+                  <div class="forge-editor-heading"><label id="forgeEditorLabel" for="forgeDraftEditor">可直接修改</label><small id="forgeEditorHint">修改后的内容会成为后续步骤的依据</small></div>
+                  <textarea id="forgeDraftEditor" rows="22" spellcheck="true" aria-describedby="forgeEditorHint forgeReviewNotice"></textarea>
+                </div>
+                <section class="forge-draft-preview forge-review-pane prose" id="forgePreviewPane" role="tabpanel" aria-labelledby="forgePreviewViewTab" aria-label="当前草稿预览">
+                  <div class="forge-preview-label"><span>阅读预览</span><small>随编辑实时更新</small></div>
+                  <div id="forgeDraftPreview"></div>
+                </section>
+              </div>
+              <p class="forge-review-notice" id="forgeReviewNotice" role="status" aria-live="polite"></p>
+              <footer class="forge-review-actions">
+                <button class="secondary-button" id="redoForgeStep" type="button">重新生成本步骤</button>
+                <button class="primary-button" id="approveForgeStep" type="button"><span>确认并生成下一步</span><svg><use href="#i-arrow"/></svg></button>
+              </footer>
+            </section>
+            <aside class="canon-panel" id="canonPanel" aria-label="世界正典摘要" hidden>
+              <header><span>WORLD CANON</span><div><strong>世界正典</strong><small>后续正文唯一可用的事实底稿</small></div></header>
+              <p id="canonIdentity"></p>
+              <div class="canon-stats" id="canonStats"></div>
+              <ol class="canon-axioms" id="canonAxioms"></ol>
+            </aside>
+            <div class="confirmed-world-label" id="confirmedWorldLabel" hidden><span>已经确认的世界内容</span><small>后续生成只会读取已确认版本</small></div>
             <article class="world-preview prose" id="worldPreview"><div class="empty-state"><svg><use href="#i-layers"/></svg><strong>等待选择世界模型</strong><span>选中后，这里会依照因果顺序构建完整世界。</span></div></article>
           </div>
         </div>
@@ -216,15 +295,15 @@
 
       <section class="screen" id="screen-audit" data-screen="audit" hidden>
         <div class="section-header compact-header">
-          <div><p class="eyebrow">审计 · 找出站不住的地方</p><h2>世界不是写完了，<br>是经得起追问了。</h2><p>校验器按用途装载规则，区分真正矛盾与有意的风格选择。</p></div>
+          <div><p class="eyebrow">审计 · 找出站不住的地方</p><h2>只拦真正的矛盾，<br>不拿建议反复打扰。</h2><p>只有明确的事实冲突会列为必须处理；文字偏好和补充空间只是可选建议，不会阻止世界完成。</p></div>
           <button class="secondary-button" id="rerunAudit" type="button">重新审计</button>
         </div>
         <div class="audit-hero" id="auditHero"></div>
         <div class="audit-grid">
-          <section class="audit-panel"><div class="panel-title"><span>需要修补</span><small id="violationCount">0 项</small></div><div id="violationsList"></div></section>
-          <section class="audit-panel"><div class="panel-title"><span>已通过规则</span><small>结构基础</small></div><div class="passed-list" id="passedRules"></div></section>
+          <section class="audit-panel"><div class="panel-title"><span>必须处理的矛盾</span><small id="violationCount">0 项</small></div><div id="violationsList"></div></section>
+          <section class="audit-panel"><div class="panel-title"><span>可选改进建议</span><small id="auditSuggestionCount">0 项</small></div><div id="auditSuggestions"></div><div class="passed-list" id="passedRules"></div></section>
         </div>
-        <div class="audit-actions"><button class="secondary-button" id="skipRepair" type="button">保留现状</button><button class="primary-button" id="repairWorld" type="button"><span>让 AI 自主修补到通过</span><svg><use href="#i-check"/></svg></button></div>
+        <div class="audit-actions"><button class="secondary-button" id="skipRepair" type="button">接受当前版本并完成</button><button class="primary-button" id="repairWorld" type="button"><span>让 AI 修补关键矛盾</span><svg><use href="#i-check"/></svg></button></div>
       </section>
 
       <section class="screen" id="screen-export" data-screen="export" hidden>
@@ -248,18 +327,6 @@
       </section>
     </main>
 
-    <aside class="compass-panel" aria-label="世界结构摘要">
-      <div class="compass-head"><p class="eyebrow">WORLD COMPASS</p><h2>世界罗盘</h2></div>
-      <div class="compass-visual" id="compassVisual">
-        <span class="compass-kicker">当前世界模型</span>
-        <div class="compass-core"><span>未定</span><small>等待模型</small></div>
-        <div class="compass-axes" aria-label="世界观察维度"><span>自然</span><span>历史</span><span>文明</span><span>知识</span></div>
-      </div>
-      <div class="compass-facts" id="compassFacts">
-        <div><span>模型类型</span><strong>—</strong></div><div><span>时间结构</span><strong>—</strong></div><div><span>证据状态</span><strong>—</strong></div><div><span>覆盖范围</span><strong>—</strong></div>
-      </div>
-      <div class="compass-quote" id="compassQuote">“先解释这个世界如何存在，再讨论其中会发生什么。”</div>
-    </aside>
   </div>
 
   <dialog class="world-dialog" id="worldDetailDialog" aria-labelledby="worldDetailTitle">
@@ -295,12 +362,42 @@
     <form method="dialog" class="settings-card">
       <header><div><p class="eyebrow">MODEL ROUTING</p><h2 id="settingsTitle">模型与接口</h2></div><button class="icon-button" value="cancel" aria-label="关闭设置"><svg><use href="#i-x"/></svg></button></header>
       <div class="settings-body">
+        <p class="settings-intro">连接账号、读取该账号真正可用的模型，再用一条极短请求验证。通过后才会保存启用。</p>
+        <ol class="model-setup-steps" aria-label="模型设置进度">
+          <li data-setup-step="credentials"><i>1</i><span>连接账号</span></li>
+          <li data-setup-step="models"><i>2</i><span>选择模型</span></li>
+          <li data-setup-step="test"><i>3</i><span>验证并启用</span></li>
+        </ol>
         <div class="live-settings" id="liveSettings">
           <label><span>服务商</span><select id="providerSelect"></select></label>
-          <label><span>模型 ID</span><input id="modelInput" type="text" spellcheck="false" autocomplete="off"></label>
-          <label class="full-row"><span>API 端点</span><input id="baseUrlInput" type="url" inputmode="url" spellcheck="false" autocomplete="off"></label>
-          <label class="full-row"><span>API Key</span><input id="apiKeyInput" type="password" spellcheck="false" autocomplete="off" placeholder="保存在这个本地浏览器中"></label>
-          <label><span>创意强度 <output id="temperatureOutput">0.7</output></span><input id="temperatureInput" type="range" min="0" max="1.2" value="0.7" step="0.1"></label>
+          <label id="protocolField" hidden><span>接口标准</span><select id="protocolSelect"><option value="openai">OpenAI 兼容</option><option value="anthropic">Anthropic</option><option value="gemini">Gemini</option></select></label>
+          <div class="full-row connection-fields" id="apiConnectionFields">
+            <label><span>API Key</span><input id="apiKeyInput" type="password" spellcheck="false" autocomplete="off" placeholder="粘贴密钥后自动读取模型…"></label>
+            <label><span>API 端点</span><input id="baseUrlInput" type="url" inputmode="url" spellcheck="false" autocomplete="off"></label>
+          </div>
+          <section class="full-row cli-connection" id="claudeCliConnection" hidden>
+            <div><strong>使用本机 Claude Code 登录额度</strong><p id="claudeCliSummary">将检查安装、登录和订阅状态，不读取或复制登录凭证。</p></div>
+          </section>
+          <div class="full-row discovery-row">
+            <button class="secondary-button small" id="discoverModels" type="button"><span class="button-spinner" aria-hidden="true"></span><span>读取可用模型</span></button>
+            <span id="modelCount">尚未读取模型列表</span>
+          </div>
+          <div class="full-row model-picker-field">
+            <label for="modelInput">选择模型</label>
+            <select id="modelInput"><option value="">先读取模型列表…</option></select>
+            <button class="text-button model-manual-toggle" id="toggleManualModel" type="button">手动填写完整模型名</button>
+            <small class="field-hint" id="modelHint">列表来自当前账号与端点，不使用内置的过期清单。</small>
+          </div>
+          <label class="full-row" id="manualModelField" hidden><span>完整模型名</span><input id="manualModelInput" type="text" spellcheck="false" autocomplete="off" placeholder="例如 claude-opus-5…"><small class="field-hint">适用于旧版本、固定快照或服务商没有列出的模型。</small></label>
+          <div class="full-row model-test-row">
+            <button class="secondary-button small" id="testModelConnection" type="button"><span class="button-spinner" aria-hidden="true"></span><span>测试并修正配置</span></button>
+            <p>会发送一条极短测试请求，可能计入少量 API 或 Claude CLI 额度。</p>
+          </div>
+          <div class="full-row model-setup-status" id="modelSetupStatus" role="status" aria-live="polite" data-tone="idle"><strong>等待连接</strong><span>填写密钥，或选择 Claude CLI。</span></div>
+          <details class="full-row advanced-model-settings">
+            <summary>高级生成设置</summary>
+            <label><span>创意强度 <output id="temperatureOutput">0.7</output></span><input id="temperatureInput" type="range" min="0" max="1.2" value="0.7" step="0.1"></label>
+          </details>
           <div class="security-callout"><svg><use href="#i-lock"/></svg><span>密钥只保存在当前设备的这个浏览器中，不会写入源码、日志、世界存档、导出文件或远端仓库。</span></div>
         </div>
         <details class="image-settings">
@@ -312,7 +409,7 @@
           </div>
         </details>
       </div>
-      <footer><span id="healthStatus">本地服务已连接</span><div class="settings-actions"><button class="text-button" id="clearSavedKeys" type="button">清除本机密钥</button><button class="primary-button small" id="saveSettings" value="default"><span>应用并保存</span></button></div></footer>
+      <footer><span id="healthStatus">本地服务已连接</span><div class="settings-actions"><button class="text-button" id="clearSavedKeys" type="button">清除本机密钥</button><button class="primary-button small" id="saveSettings" type="button" disabled><span>保存并启用</span></button></div></footer>
     </form>
   </dialog>
 
@@ -325,6 +422,7 @@
       <div class="loading-track" id="loadingTrack"><i id="loadingBar"></i></div>
       <section class="loading-operation" id="loadingOperation" aria-label="操作进度" hidden>
         <div class="loading-operation-meta"><span id="loadingModel">模型处理中</span><time id="loadingElapsed">已等待 0 秒</time></div>
+        <div class="loading-live" role="status" aria-live="polite"><span class="loading-spinner" aria-hidden="true"></span><span id="loadingLive">正在准备本轮生成</span></div>
         <ol class="loading-stages" id="loadingStages"></ol>
         <p class="loading-assurance" id="loadingAssurance">模型返回后会自动校验并进入选择页面，无需重复点击。</p>
       </section>
@@ -332,6 +430,6 @@
   </div>
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 
-  <script type="module" src="/js/app.js?v=35"></script>
+  <script type="module" src="/js/app.js?v=64"></script>
 </body>
 </html>

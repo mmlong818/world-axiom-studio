@@ -43,15 +43,32 @@ function cleanStringList(value, limit) {
     .slice(0, limit);
 }
 
-export function normalizeSourceDossier(value, fallbackMode = 'create') {
+function cleanReferenceList(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .filter((item) => item && typeof item === 'object' && /^https:\/\//i.test(String(item.url ?? '')))
+    .map((item) => ({
+      title: String(item.title ?? '').trim().slice(0, 160),
+      url: String(item.url).trim().slice(0, 1_000),
+      provider: String(item.provider ?? '').trim().slice(0, 80),
+      kind: String(item.kind ?? '').trim().slice(0, 80),
+    }))
+    .filter((item) => item.title && item.url)
+    .slice(0, 12);
+}
+
+export function normalizeSourceDossier(value, fallbackMode = 'original') {
   const input = value && typeof value === 'object' ? value : {};
   const facts = input.confirmed_facts && typeof input.confirmed_facts === 'object' ? input.confirmed_facts : {};
   return {
-    mode: input.mode === 'reconstruct' || input.mode === 'create' ? input.mode : fallbackMode,
+    mode: ['original', 'reconstruct', 'source_expand'].includes(input.mode)
+      ? input.mode
+      : input.mode === 'create' ? 'original' : fallbackMode,
     source_summary: String(input.source_summary ?? '').trim().slice(0, 1_200),
     confirmed_facts: Object.fromEntries(DOSSIER_FACT_GROUPS.map((group) => [group, cleanStringList(facts[group], 80)])),
     contested: cleanStringList(input.contested, 40),
     unknowns: cleanStringList(input.unknowns, 40),
+    references: cleanReferenceList(input.references),
   };
 }
 
@@ -190,16 +207,27 @@ export function cleanModelMarkdown(value) {
 }
 
 export function getAuditViolations(audit) {
+  const hasStructuredLists = Array.isArray(audit?.canon_violations) || Array.isArray(audit?.prose_violations);
+  if (hasStructuredLists) {
+    return [...(Array.isArray(audit?.canon_violations) ? audit.canon_violations : []), ...(Array.isArray(audit?.prose_violations) ? audit.prose_violations : [])];
+  }
   return Array.isArray(audit?.violations) ? audit.violations : [];
 }
 
+export function getBlockingAuditViolations(audit) {
+  return getAuditViolations(audit).filter((item) => String(item?.severity || '').toLowerCase() === 'high');
+}
+
+export function getAdvisoryAuditViolations(audit) {
+  return getAuditViolations(audit).filter((item) => String(item?.severity || '').toLowerCase() !== 'high');
+}
+
 export function getAuditBurden(audit) {
-  const weights = { high: 4, medium: 2, low: 1 };
-  return getAuditViolations(audit).reduce((total, item) => total + (weights[item?.severity] || 2), 0);
+  return getBlockingAuditViolations(audit).length * 4;
 }
 
 export function hasAuditPassed(audit) {
-  return getAuditViolations(audit).length === 0;
+  return getBlockingAuditViolations(audit).length === 0;
 }
 
 export function safeImageSource(value) {

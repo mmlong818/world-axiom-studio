@@ -6,8 +6,8 @@
   "description": "从简要说明或书籍生成可查阅、可追溯的世界之书，并导出图文 Wiki、简版与结构化数据。",
   "scripts": {
     "start": "node start.mjs",
-    "test": "node --test --test-isolation=none",
-    "check": "node --check start.mjs && node --check server.mjs && node --check lib/providers.mjs && node --check lib/extractors.mjs && node --check lib/prompts.mjs && node --check public/js/app.js && node --check public/js/api.js && node --check public/js/exporters.js && node --check public/js/utils.js && node --check public/js/world-store.js"
+    "test": "node --test --test-isolation=none test/core.test.mjs",
+    "check": "node --check start.mjs && node --check server.mjs && node --check lib/providers.mjs && node --check lib/model-routing.mjs && node --check lib/claude-cli.mjs && node --check lib/extractors.mjs && node --check lib/prompts.mjs && node --check lib/research.mjs && node --check lib/workflow.mjs && node --check public/js/app.js && node --check public/js/api.js && node --check public/js/canon-markdown.js && node --check public/js/exporters.js && node --check public/js/utils.js && node --check public/js/world-store.js && node --check test/mock-model-server.mjs"
   },
   "engines": {
     "node": ">=20"

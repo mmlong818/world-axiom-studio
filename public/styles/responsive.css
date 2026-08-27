@@ -1,7 +1,7 @@
 @media (max-width: 1180px) {
   .app-shell { grid-template-columns: 188px minmax(0, 1fr); }
-  .compass-panel { display: none; }
   .brand-copy small { display: none; }
+  .seed-card-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
 }
 
 @media (max-width: 900px) {
@@ -36,9 +36,14 @@
   .library-heading .primary-button { justify-self: start; }
   .seed-card-grid { grid-template-columns: 1fr; }
   .seed-card { min-height: 0; }
+  .seed-card > *, .source-treatment, .seed-life-grid { grid-column: 1; }
   .forge-layout { grid-template-columns: 1fr; }
-  .forge-progress { position: static; grid-template-columns: repeat(5,1fr); }
-  .forge-step { grid-template-columns: 24px 1fr; padding: 8px; }
+  .forge-progress { position: static; display: flex; padding-bottom: 4px; overflow-x: auto; scroll-snap-type: x proximity; }
+  .research-workspace { grid-template-columns: 1fr; }
+  .research-brief-card { grid-row: auto; }
+  .research-summary-card, .research-questions-card, .research-plot-card, .research-sources-card, .research-gaps-card { grid-column: auto; }
+  .forge-step { grid-template-columns: 24px 1fr; min-width: 180px; padding: 8px; scroll-snap-align: start; }
+  .forge-step.is-phase-break { margin-top: 0; margin-left: 12px; }
   .forge-activity-head, .forge-activity-foot { align-items: flex-start; flex-direction: column; gap: 4px; }
   .audit-grid { grid-template-columns: 1fr; }
 }
@@ -61,6 +66,7 @@
   .source-tab { justify-content: center; padding-inline: 10px; }
   .source-panel { padding-top: 24px; }
   .meta-grid, .dial-grid, .live-settings { grid-template-columns: 1fr; }
+  .meta-grid.is-essential { grid-template-columns: 1fr; }
   .dial-grid label:last-child, .full-row { grid-column: auto; }
   .toggle-row { grid-template-columns: 1fr; }
   .creative-direction-body { grid-template-columns: 1fr; gap: 20px; }
@@ -68,9 +74,26 @@
   .primary-action-row .primary-button { width: 100%; min-height: 50px; }
   .compact-header { align-items: stretch; flex-direction: column; margin-bottom: 26px; }
   .compact-header .secondary-button { align-self: flex-start; }
+  .research-header-actions { justify-content: flex-start; }
   .forge-progress { display: flex; padding-bottom: 4px; overflow-x: auto; }
   .forge-step { min-width: 150px; }
+  .forge-review-head, .forge-review-actions, .forge-editor-heading, .confirmed-world-label { align-items: stretch; flex-direction: column; }
+  .forge-view-switch { width: calc(100% - 32px); margin: 14px 16px 0; }
+  .forge-editor-field { padding: 20px 16px 24px; }
+  .forge-review-actions button { width: 100%; }
+  #forgeDraftEditor { min-height: 360px; }
+  .forge-draft-preview { padding: 22px 18px 40px; }
   .world-preview { padding: 22px 18px; }
+  .canon-stats { grid-template-columns: 1fr 1fr; }
+  .canon-stats div:nth-child(2) { border-right: 0; }
+  .canon-stats div:nth-child(-n+2) { border-bottom: 1px solid rgba(23,79,70,.18); }
+  .research-gaps-card ul { columns: 1; }
+  .research-brief-card { grid-template-columns: 1fr; }
+  .research-brief-card > *, .research-brief-card h3, .research-brief-card .research-works, .research-brief-card .research-interpretation, .research-brief-card dl { grid-column: 1; grid-row: auto; }
+  .source-continuity-report li { grid-template-columns: 1fr; }
+  .source-continuity-report li small { grid-column: 1; }
+  .research-brief-card dl { margin-top: 12px; }
+  .source-foundations article p { grid-template-columns: 1fr; gap: 3px; }
   .audit-hero { grid-template-columns: 1fr; text-align: center; }
   .score-ring { margin: auto; }
   .audit-actions { flex-direction: column-reverse; }
@@ -83,6 +106,7 @@
   .wiki-toc ol { grid-template-columns: 1fr; }
   .wiki-toc li:nth-child(odd) { border-right: 0; }
   .source-layer-band b { display: none; }
+  .source-references ul { grid-template-columns: 1fr; }
   .wiki-cover { padding: 28px 22px; }
   .art-direction { align-items: stretch; flex-direction: column; }
   .art-direction button { width: 100%; }
@@ -98,6 +122,15 @@
   .confirm-actions { flex-direction: column-reverse; }
   .confirm-actions button { width: 100%; }
   .settings-body { padding: 18px 16px; }
+  .connection-fields { grid-template-columns: 1fr; }
+  .model-setup-steps { gap: 4px; }
+  .model-setup-steps li { align-items: flex-start; padding: 8px 4px; }
+  .discovery-row, .model-test-row { align-items: stretch; flex-direction: column; }
+  .discovery-row button, .model-test-row button { width: 100%; }
+  .model-picker-field { grid-template-columns: 1fr; }
+  .model-picker-field > label, .model-picker-field > .field-hint { grid-column: 1; }
+  .model-manual-toggle { justify-self: start; }
+  .model-setup-status { grid-template-columns: 1fr; gap: 4px; }
   .settings-card footer > #healthStatus { display: none; }
   .settings-actions { width: 100%; flex-direction: column-reverse; }
   .settings-card footer button { width: 100%; }
@@ -123,11 +156,19 @@
   .dropzone { min-height: 240px; padding: 22px 16px; }
   .field-foot span:first-child { max-width: 24ch; }
   .seed-card { padding: 18px; }
+  .seed-card-head { padding-right: 64px; }
+  .seed-life-grid { grid-template-columns: 1fr; }
+  .source-treatment > article { grid-template-columns: 1fr; }
+  .source-treatment article > strong { grid-row: auto; }
+  .source-treatment article p { grid-column: 1; }
+  .research-roots > article { grid-template-columns: 1fr; }
+  .research-roots article header { grid-row: auto; }
+  .research-roots article p, .research-roots article small { grid-column: 1; }
 }
 
 @media print {
   body { background: white; }
-  .rail, .topbar, .compass-panel, .section-header, .export-tabs, .art-direction, .download-grid { display: none !important; }
+  .rail, .topbar, .section-header, .export-tabs, .art-direction, .download-grid { display: none !important; }
   .app-shell, .main-column { display: block; border: 0; }
   .screen { max-width: none; padding: 0; }
   .screen:not(#screen-export) { display: none !important; }
